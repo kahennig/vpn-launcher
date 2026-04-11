@@ -1209,6 +1209,7 @@ class VPNLauncher(QMainWindow):
                     item = self.profile_tree.topLevelItem(i)
                     if item:
                         item.setText(5, ts)
+                        item.setData(0, Qt.ItemDataRole.UserRole, p)
                     break
             save_profiles(self.profiles)
             self._update_state(self.STATE_CONNECTED)
