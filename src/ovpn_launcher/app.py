@@ -12,266 +12,29 @@ from datetime import datetime
 from pathlib import Path
 
 from PyQt6.QtCore import Qt, QProcess, QSettings, QSize, QTimer, QEvent
-from PyQt6.QtGui import QIcon, QAction, QTextCursor, QKeySequence, QPalette, QFont, QPixmap, QPainter, QColor
+from PyQt6.QtGui import QIcon, QAction, QTextCursor, QKeySequence, QPalette, QPixmap, QPainter, QColor
 from PyQt6.QtWidgets import (
     QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
     QTreeWidget, QTreeWidgetItem, QPushButton, QLabel, QSystemTrayIcon,
     QMenu, QInputDialog, QLineEdit, QMessageBox, QTextEdit, QSplitter,
-    QToolBar, QStatusBar, QHeaderView, QStyle, QDialog, QTabWidget,
-    QFormLayout, QComboBox, QFileDialog, QDialogButtonBox, QToolButton,
-    QSpinBox, QSplashScreen, QTextBrowser,
+    QToolBar, QStatusBar, QHeaderView, QDialog, QTabWidget,
+    QFileDialog, QToolButton, QSplashScreen, QTextBrowser,
 )
 
-from .paths import CONNECTIONS_CONF, openvpn_binary
+from .paths import openvpn_binary
 from .paths import CONFIG_DIR, LOG_DIR, AUTOSTART_DIR, AUTOSTART_DESKTOP, OPENVPN_PREFIX
-from .profiles import load_profiles, save_profiles, detect_versions, load_settings, save_settings, VALID_AUTH_MODES
+from .profiles import load_profiles, save_profiles, load_settings, save_settings
 from . import __version__
 
-from .builder import fetch_available_versions, installed_versions, build_openvpn
+from .builder import installed_versions
+from .dialogs import BuildDialog, SettingsDialog, ProfileDialog
+from .services import (
+    log_color, validate_ovpn, extract_remote_host,
+    export_profile_zip, import_profile_zip, fetch_keepass_creds,
+)
 
 log = logging.getLogger(__name__)
 
-
-class BuildDialog(QDialog):
-    def __init__(self, parent=None, prefix="/opt"):
-        super().__init__(parent)
-        self.prefix = prefix
-        self.setWindowTitle("Build OpenVPN")
-        self.setMinimumSize(500, 400)
-        layout = QVBoxLayout(self)
-
-        row = QHBoxLayout()
-        row.addWidget(QLabel("Version:"))
-        self.version_combo = QComboBox()
-        self.version_combo.setEditable(True)
-        self.version_combo.addItem("Loading versions...")
-        row.addWidget(self.version_combo)
-        self.build_btn = QPushButton("Build")
-        self.build_btn.clicked.connect(self._start_build)
-        row.addWidget(self.build_btn)
-        layout.addLayout(row)
-
-        self.output = QTextEdit()
-        self.output.setReadOnly(True)
-        self.output.setStyleSheet("font-family: monospace; font-size: 9pt;")
-        layout.addWidget(self.output)
-
-        self.close_btn = QPushButton("Close")
-        self.close_btn.clicked.connect(self.accept)
-        btn_layout = QHBoxLayout()
-        btn_layout.addStretch()
-        btn_layout.addWidget(self.close_btn)
-        layout.addLayout(btn_layout)
-
-        self._building = False
-        QTimer.singleShot(0, self._load_versions)
-
-    def _load_versions(self):
-        self.version_combo.clear()
-        inst = set(installed_versions(self.prefix))
-        available = fetch_available_versions()
-        for v in available:
-            label = f"{v} (installed)" if v in inst else v
-            self.version_combo.addItem(label, v)
-        if not available:
-            self.version_combo.addItem("(type version manually)")
-
-    def _start_build(self):
-        if self._building:
-            return
-        version = self.version_combo.currentData() or self.version_combo.currentText().strip()
-        if not version or version.startswith("("):
-            return
-        self._building = True
-        self.build_btn.setEnabled(False)
-        self.close_btn.setEnabled(False)
-        self.output.clear()
-
-        import threading
-        def run():
-            build_openvpn(version, self.prefix, on_output=self._append_output)
-            self._build_done()
-        threading.Thread(target=run, daemon=True).start()
-
-    def _append_output(self, text):
-        from PyQt6.QtCore import QMetaObject, Qt as QtConst, Q_ARG
-        QMetaObject.invokeMethod(self.output, "append", QtConst.ConnectionType.QueuedConnection, Q_ARG(str, text))
-
-    def _build_done(self):
-        self._append_output("\n--- Build process finished ---")
-        self._building = False
-        QTimer.singleShot(0, self._enable_buttons)
-
-    def _enable_buttons(self):
-        self.build_btn.setEnabled(True)
-        self.close_btn.setEnabled(True)
-        self._load_versions()
-
-
-class SettingsDialog(QDialog):
-    def __init__(self, parent=None, settings=None):
-        super().__init__(parent)
-        self.setWindowTitle("Settings")
-        self.setMinimumWidth(480)
-        s = settings or {}
-        layout = QFormLayout(self)
-
-        row = QHBoxLayout()
-        self.prefix_edit = QLineEdit(s.get("openvpn_prefix", "/opt"))
-        btn = QPushButton("Browse…")
-        btn.clicked.connect(lambda: self._browse_dir(self.prefix_edit))
-        row.addWidget(self.prefix_edit)
-        row.addWidget(btn)
-        layout.addRow("OpenVPN Prefix:", row)
-
-        row2 = QHBoxLayout()
-        self.keepass_edit = QLineEdit(s.get("keepass_db", ""))
-        btn2 = QPushButton("Browse…")
-        btn2.clicked.connect(lambda: self._browse_file(self.keepass_edit, "KeePass DB (*.kdbx);;All Files (*)"))
-        row2.addWidget(self.keepass_edit)
-        row2.addWidget(btn2)
-        layout.addRow("KeePass DB:", row2)
-
-        self.timeout_spin = QSpinBox()
-        self.timeout_spin.setRange(1, 300)
-        self.timeout_spin.setSuffix(" s")
-        self.timeout_spin.setValue(int(s.get("connection_timeout", 30)))
-        layout.addRow("Connection Timeout:", self.timeout_spin)
-
-        self.reconnect_spin = QSpinBox()
-        self.reconnect_spin.setRange(1, 120)
-        self.reconnect_spin.setSuffix(" s")
-        self.reconnect_spin.setValue(int(s.get("reconnect_delay", 5)))
-        layout.addRow("Reconnect Delay:", self.reconnect_spin)
-
-        self.ip_edit = QLineEdit(s.get("ip_service", "https://api.ipify.org"))
-        layout.addRow("IP Service URL:", self.ip_edit)
-
-        self.log_combo = QComboBox()
-        self.log_combo.addItems(["DEBUG", "INFO", "WARNING", "ERROR"])
-        self.log_combo.setCurrentText(s.get("log_level", "WARNING"))
-        layout.addRow("Log Level:", self.log_combo)
-
-        buttons = QDialogButtonBox(QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel)
-        buttons.accepted.connect(self.accept)
-        buttons.rejected.connect(self.reject)
-        layout.addRow(buttons)
-
-    def _browse_dir(self, line_edit):
-        path = QFileDialog.getExistingDirectory(self, "Select Directory", line_edit.text())
-        if path:
-            line_edit.setText(path)
-
-    def _browse_file(self, line_edit, filter_str):
-        path, _ = QFileDialog.getOpenFileName(self, "Select File", line_edit.text(), filter_str)
-        if path:
-            line_edit.setText(path)
-
-    def get_settings(self):
-        return {
-            "openvpn_prefix": self.prefix_edit.text().strip(),
-            "keepass_db": self.keepass_edit.text().strip(),
-            "connection_timeout": self.timeout_spin.value(),
-            "reconnect_delay": self.reconnect_spin.value(),
-            "ip_service": self.ip_edit.text().strip(),
-            "log_level": self.log_combo.currentText(),
-        }
-
-
-class ProfileDialog(QDialog):
-    def __init__(self, parent=None, profile=None, existing_aliases=None):
-        super().__init__(parent)
-        self.existing_aliases = existing_aliases or []
-        self.setWindowTitle("Edit Profile" if profile else "Add Profile")
-        self.setMinimumWidth(420)
-
-        layout = QFormLayout(self)
-
-        self.alias_edit = QLineEdit()
-        layout.addRow("Alias:", self.alias_edit)
-
-        self.version_combo = QComboBox()
-        self.version_combo.setEditable(True)
-        for v in detect_versions():
-            if v.startswith("system"):
-                self.version_combo.addItem(v, "system")
-            else:
-                self.version_combo.addItem(v, v)
-        layout.addRow("OpenVPN Version:", self.version_combo)
-
-        config_row = QHBoxLayout()
-        self.config_edit = QLineEdit()
-        browse_btn = QPushButton("Browse…")
-        browse_btn.clicked.connect(self._browse_config)
-        config_row.addWidget(self.config_edit)
-        config_row.addWidget(browse_btn)
-        layout.addRow("Config File:", config_row)
-
-        self.auth_combo = QComboBox()
-        self.auth_combo.addItems(VALID_AUTH_MODES)
-        self.auth_combo.currentTextChanged.connect(self._on_auth_mode_changed)
-        layout.addRow("Auth Mode:", self.auth_combo)
-
-        self.keepass_entry_edit = QLineEdit()
-        self.keepass_entry_edit.setPlaceholderText("(uses alias if empty)")
-        self._keepass_entry_label = QLabel("KeePass Entry:")
-        layout.addRow(self._keepass_entry_label, self.keepass_entry_edit)
-
-        buttons = QDialogButtonBox(QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel)
-        buttons.accepted.connect(self._validate_and_accept)
-        buttons.rejected.connect(self.reject)
-        layout.addRow(buttons)
-
-        if profile:
-            self.alias_edit.setText(profile["alias"])
-            idx = self.version_combo.findData(profile["version"])
-            if idx >= 0:
-                self.version_combo.setCurrentIndex(idx)
-            else:
-                self.version_combo.setCurrentText(profile["version"])
-            self.config_edit.setText(profile["config"])
-            self.auth_combo.setCurrentText(profile.get("auth_mode", "none"))
-            self.keepass_entry_edit.setText(profile.get("keepass_entry", ""))
-
-        self._on_auth_mode_changed(self.auth_combo.currentText())
-
-    def _on_auth_mode_changed(self, mode):
-        visible = mode == "keepass"
-        self._keepass_entry_label.setVisible(visible)
-        self.keepass_entry_edit.setVisible(visible)
-
-    def _browse_config(self):
-        path, _ = QFileDialog.getOpenFileName(
-            self, "Select OpenVPN Config", "",
-            "OpenVPN Config (*.ovpn *.conf);;All Files (*)",
-        )
-        if path:
-            self.config_edit.setText(path)
-
-    def _validate_and_accept(self):
-        alias = self.alias_edit.text().strip()
-        if not alias:
-            QMessageBox.warning(self, "Validation", "Alias cannot be empty.")
-            return
-        if alias in self.existing_aliases:
-            QMessageBox.warning(self, "Validation", f"Alias '{alias}' already exists.")
-            return
-        config = self.config_edit.text().strip()
-        if not config:
-            QMessageBox.warning(self, "Validation", "Config file cannot be empty.")
-            return
-        if not Path(config).is_file():
-            QMessageBox.warning(self, "Warning", f"Config file not found:\n{config}\n\nProfile will be saved anyway.")
-        self.accept()
-
-    def get_profile(self):
-        return {
-            "alias": self.alias_edit.text().strip(),
-            "version": self.version_combo.currentData() or self.version_combo.currentText().strip(),
-            "config": self.config_edit.text().strip(),
-            "auth_mode": self.auth_combo.currentText(),
-            "keepass_entry": self.keepass_entry_edit.text().strip(),
-        }
 
 
 class VPNLauncher(QMainWindow):
@@ -332,7 +95,7 @@ class VPNLauncher(QMainWindow):
 
         self.action_reload = QAction(QIcon.fromTheme("view-refresh"), "&Reload Profiles", self)
         self.action_reload.setShortcut(QKeySequence.StandardKey.Refresh)
-        self.action_reload.setToolTip("Reload profiles from connections.conf")
+        self.action_reload.setToolTip("Reload profiles from config.yaml")
         self.action_reload.triggered.connect(self.reload_profiles)
 
         self.action_clear_log = QAction(QIcon.fromTheme("edit-clear-history"), "Clear &Log", self)
@@ -722,16 +485,8 @@ class VPNLauncher(QMainWindow):
     # ── Log Helpers ──────────────────────────────────────────────────
 
     def _log_color(self, text):
-        t = text.lower()
-        if "error" in t or "fatal" in t:
-            return "#e74c3c"
-        if "warn" in t:
-            return "#e67e22"
-        if "initialization sequence completed" in t:
-            return "#27ae60"
-        if text.startswith("--") or text.startswith("---") or text.startswith("$"):
-            return self.palette().color(QPalette.ColorRole.PlaceholderText).name()
-        return None
+        muted = self.palette().color(QPalette.ColorRole.PlaceholderText).name()
+        return log_color(text, muted_color=muted)
 
     def _log_append(self, text):
         color = self._log_color(text)
@@ -863,38 +618,35 @@ class VPNLauncher(QMainWindow):
         if not src:
             return
         try:
-            with zipfile.ZipFile(src, "r") as zf:
-                if "profile.conf" not in zf.namelist():
-                    QMessageBox.warning(self, "Import", "No profile.conf found in zip.")
+            meta, ovpn_bytes = import_profile_zip(src)
+        except (ValueError, zipfile.BadZipFile) as e:
+            QMessageBox.warning(self, "Import", str(e))
+            return
+        ovpn_name = meta["config"]
+        configs_dir = CONFIG_DIR / "configs"
+        configs_dir.mkdir(parents=True, exist_ok=True)
+        dest = configs_dir / ovpn_name
+        if ovpn_bytes is not None:
+            if dest.exists():
+                ans = QMessageBox.question(
+                    self, "File Exists",
+                    f"{ovpn_name} already exists in configs.\nOverwrite?",
+                    QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+                )
+                if ans != QMessageBox.StandardButton.Yes:
                     return
-                conf_line = zf.read("profile.conf").decode().strip()
-                parts = conf_line.split("|")
-                if len(parts) < 3:
-                    QMessageBox.warning(self, "Import", "Invalid profile.conf format.")
-                    return
-                alias, version, ovpn_name = parts[0], parts[1], parts[2]
-                auth_mode = parts[3] if len(parts) >= 4 else "none"
-                configs_dir = CONFIG_DIR / "configs"
-                configs_dir.mkdir(parents=True, exist_ok=True)
-                dest = configs_dir / ovpn_name
-                if ovpn_name in zf.namelist():
-                    if dest.exists():
-                        ans = QMessageBox.question(
-                            self, "File Exists",
-                            f"{ovpn_name} already exists in configs.\nOverwrite?",
-                            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
-                        )
-                        if ans != QMessageBox.StandardButton.Yes:
-                            return
-                    dest.write_bytes(zf.read(ovpn_name))
-                profile = {"alias": alias, "version": version, "config": str(dest), "auth_mode": auth_mode}
-                dlg = ProfileDialog(self, profile=profile, existing_aliases=[p["alias"] for p in self.profiles])
-                if dlg.exec() == QDialog.DialogCode.Accepted:
-                    self.profiles.append(dlg.get_profile())
-                    save_profiles(self.profiles)
-                    self.reload_profiles()
-        except zipfile.BadZipFile:
-            QMessageBox.critical(self, "Import", "Invalid zip file.")
+            dest.write_bytes(ovpn_bytes)
+        profile = {
+            "alias": meta["alias"], "version": meta["version"],
+            "config": str(dest), "auth_mode": meta.get("auth_mode", "none"),
+        }
+        if meta.get("keepass_entry"):
+            profile["keepass_entry"] = meta["keepass_entry"]
+        dlg = ProfileDialog(self, profile=profile, existing_aliases=[p["alias"] for p in self.profiles])
+        if dlg.exec() == QDialog.DialogCode.Accepted:
+            self.profiles.append(dlg.get_profile())
+            save_profiles(self.profiles)
+            self.reload_profiles()
 
     def on_edit_profile(self):
         item = self.profile_tree.currentItem()
@@ -935,14 +687,7 @@ class VPNLauncher(QMainWindow):
         )
         if not dest:
             return
-        config_path = Path(profile["config"])
-        parts = [profile["alias"], profile["version"], config_path.name]
-        if profile.get("auth_mode", "none") != "none":
-            parts.append(profile["auth_mode"])
-        with zipfile.ZipFile(dest, "w", zipfile.ZIP_DEFLATED) as zf:
-            if config_path.is_file():
-                zf.write(config_path, config_path.name)
-            zf.writestr("profile.conf", "|".join(parts) + "\n")
+        export_profile_zip(profile, dest)
 
     def on_ping_profile(self):
         item = self.profile_tree.currentItem()
@@ -953,14 +698,7 @@ class VPNLauncher(QMainWindow):
         if not config_path.is_file():
             self._log_append(f"-- Config file not found: {config_path} --")
             return
-        host = None
-        for line in config_path.read_text().splitlines():
-            line = line.strip()
-            if line.startswith("remote "):
-                parts = line.split()
-                if len(parts) >= 2:
-                    host = parts[1]
-                break
+        host = extract_remote_host(config_path)
         if not host:
             self._log_append(f"-- No 'remote' directive found in {config_path.name} --")
             return
@@ -1034,9 +772,8 @@ class VPNLauncher(QMainWindow):
 
     def _get_keepass_creds(self, alias, keepass_entry=""):
         entry = keepass_entry or alias
-        keepass_db = Path(self._app_settings.get("keepass_db", "~/Document/Keepass/keepass.kdbx")).expanduser()
-        log.debug("KeePass lookup: entry='%s', db='%s', exists=%s", entry, keepass_db, keepass_db.exists())
-        if not keepass_db.exists():
+        keepass_db = self._app_settings.get("keepass_db", "~/Document/Keepass/keepass.kdbx")
+        if not Path(keepass_db).expanduser().exists():
             log.warning("KeePass DB not found: %s", keepass_db)
             return None, None
         password, ok = QInputDialog.getText(
@@ -1045,28 +782,9 @@ class VPNLauncher(QMainWindow):
         )
         if not ok or not password:
             return None, None
-        try:
-            r_user = subprocess.run(
-                ["keepassxc-cli", "show", "-q", "-s", "-a", "Username", str(keepass_db), entry],
-                input=password, capture_output=True, text=True, timeout=10,
-            )
-            r_pwd = subprocess.run(
-                ["keepassxc-cli", "show", "-q", "-s", "-a", "Password", str(keepass_db), entry],
-                input=password, capture_output=True, text=True, timeout=10,
-            )
-            user = r_user.stdout.strip()
-            pwd = r_pwd.stdout.strip()
-            if not user or not pwd:
-                log.warning("KeePass lookup failed for '%s': user_rc=%d pwd_rc=%d stderr=%s",
-                            entry, r_user.returncode, r_pwd.returncode,
-                            (r_user.stderr or r_pwd.stderr).strip())
-            else:
-                log.debug("KeePass credentials obtained for '%s'", entry)
-        except subprocess.TimeoutExpired:
-            return None, None
-        finally:
-            password = None  # noqa: F841
-        return (user, pwd) if user and pwd else (None, None)
+        result = fetch_keepass_creds(entry, keepass_db, password)
+        password = None  # noqa: F841
+        return result
 
     # ── Prompt Credentials ────────────────────────────────────────
 
@@ -1115,8 +833,7 @@ class VPNLauncher(QMainWindow):
             QMessageBox.critical(self, "Error", f"Config file not found:\n{config}")
             return
 
-        ovpn_text = Path(config).read_text(errors="replace")
-        missing = [d for d in ("remote", "dev") if not any(l.strip().startswith(d) for l in ovpn_text.splitlines())]
+        missing = validate_ovpn(config)
         if missing:
             ans = QMessageBox.warning(
                 self, "Config Warning",

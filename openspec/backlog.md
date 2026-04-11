@@ -1,6 +1,6 @@
 # Backlog OpenSpec
 
-> Actualizado: 2026-04-10
+> Actualizado: 2026-04-11
 
 ## Completadas
 
@@ -66,6 +66,13 @@
 | T061 | Fix crash menú hamburguesa | ✅ DONE |
 | T062 | Expandir tests v2 | ✅ DONE |
 | T063 | Build OpenVPN desde la GUI | ✅ DONE |
+| T070 | Migrar import/export de perfiles a YAML + limpiar referencias legacy | ✅ DONE |
+
+## Pendientes — Refactor y calidad
+
+| ID | Tarea | Estado | Justificación |
+|----|-------|--------|---------------|
+| T071 | Refactor app.py → lógica testeable sin GUI | ✅ DONE | app.py crece mucho; extraer lógica de negocio (import/export, conexión, etc.) a módulos puros testeables en CI sin pytest-qt ni display |
 
 ## Pendientes — Cross-platform (ambos SO)
 

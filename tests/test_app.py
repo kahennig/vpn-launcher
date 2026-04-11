@@ -3,7 +3,7 @@
 import pytest
 from unittest.mock import patch
 
-from ovpn_launcher.app import ProfileDialog
+from ovpn_launcher.dialogs import ProfileDialog
 
 
 class TestProfileDialogAdd:
@@ -92,7 +92,7 @@ class TestProfileDialogValidation:
             mock_accept.assert_called_once()
 
 
-from ovpn_launcher.app import ProfileDialog, SettingsDialog
+from ovpn_launcher.dialogs import ProfileDialog, SettingsDialog
 from ovpn_launcher.profiles import DEFAULT_SETTINGS
 
 
