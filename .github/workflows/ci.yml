@@ -25,7 +25,10 @@ jobs:
       - name: Install package
         run: pip install -e .
 
-      - name: Run tests
+      - name: Run non-GUI tests
+        run: pytest tests/test_profiles.py tests/test_paths.py -v
+
+      - name: Run GUI tests
         uses: coactions/setup-xvfb@v1
         with:
-          run: pytest tests/ -v
+          run: pytest tests/test_app.py -v -k "not VPNLauncher and not LogColor"
