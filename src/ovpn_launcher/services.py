@@ -1,11 +1,16 @@
 """Pure business logic for VPN Launcher (no Qt dependency)."""
 
 import logging
+import socket
 import subprocess
 import zipfile
 from pathlib import Path
+from urllib.request import urlopen, Request
+from urllib.error import URLError
 
 import yaml
+
+from .paths import IS_WINDOWS, AUTOSTART_DIR, AUTOSTART_FILE
 
 log = logging.getLogger(__name__)
 
@@ -103,3 +108,69 @@ def fetch_keepass_creds(entry, db_path, master_password):
         return user, pwd
     except subprocess.TimeoutExpired:
         return None, None
+
+
+def elevate_command(command, gui=False):
+    """Wrap a command list with privilege escalation for the current platform."""
+    if IS_WINDOWS:
+        return list(command)
+    return ["pkexec" if gui else "sudo"] + list(command)
+
+
+def kill_command(pid, gui=False):
+    """Build a command to kill a process with elevated privileges."""
+    if IS_WINDOWS:
+        return ["taskkill", "/F", "/PID", str(pid)]
+    return ["pkexec" if gui else "sudo", "kill", str(pid)]
+
+
+def fetch_public_ip(url="https://api.ipify.org", timeout=5):
+    """Fetch public IP address. Returns IP string or empty string on failure."""
+    try:
+        with urlopen(Request(url), timeout=timeout) as resp:
+            return resp.read().decode().strip()
+    except (URLError, OSError, ValueError):
+        return ""
+
+
+def dns_resolver_ip(timeout=5):
+    """Check DNS resolver via Akamai whoami. Returns IP string or empty string."""
+    try:
+        old_timeout = socket.getdefaulttimeout()
+        socket.setdefaulttimeout(timeout)
+        result = socket.getaddrinfo("whoami.akamai.net", None)
+        socket.setdefaulttimeout(old_timeout)
+        if result:
+            return result[0][4][0]
+    except (socket.gaierror, OSError):
+        pass
+    return ""
+
+
+def is_autostart_enabled():
+    """Check if autostart is enabled."""
+    return AUTOSTART_FILE.is_file()
+
+
+def enable_autostart():
+    """Enable autostart at login."""
+    AUTOSTART_DIR.mkdir(parents=True, exist_ok=True)
+    if IS_WINDOWS:
+        AUTOSTART_FILE.write_text(
+            'CreateObject("WScript.Shell").Run '
+            '"pythonw -m ovpn_launcher.app", 0, False\n'
+        )
+    else:
+        AUTOSTART_FILE.write_text(
+            "[Desktop Entry]\nType=Application\nName=VPN Launcher\n"
+            "Exec=ovpn-app\nIcon=ovpn-launcher\nTerminal=false\n"
+            "X-GNOME-Autostart-enabled=true\n"
+        )
+
+
+def disable_autostart():
+    """Disable autostart at login."""
+    try:
+        AUTOSTART_FILE.unlink()
+    except FileNotFoundError:
+        pass

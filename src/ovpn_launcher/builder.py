@@ -7,6 +7,8 @@ import tempfile
 from pathlib import Path
 from urllib.request import urlopen, Request
 
+from .paths import OPENVPN_GLOB
+
 
 GITHUB_TAGS_URL = "https://api.github.com/repos/OpenVPN/openvpn/tags?per_page=50"
 DOWNLOAD_URL = "https://swupdate.openvpn.net/community/releases/openvpn-{version}.tar.gz"
@@ -30,7 +32,7 @@ def fetch_available_versions():
 def installed_versions(prefix="/opt"):
     p = Path(prefix)
     versions = []
-    for d in sorted(p.glob("openvpn-*/sbin/openvpn")):
+    for d in sorted(p.glob(OPENVPN_GLOB)):
         if d.is_file():
             versions.append(d.parent.parent.name.removeprefix("openvpn-"))
     return versions

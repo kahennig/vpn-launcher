@@ -22,7 +22,7 @@ from PyQt6.QtWidgets import (
 )
 
 from .paths import openvpn_binary
-from .paths import CONFIG_DIR, LOG_DIR, AUTOSTART_DIR, AUTOSTART_DESKTOP, OPENVPN_PREFIX
+from .paths import CONFIG_DIR, LOG_DIR, OPENVPN_PREFIX
 from .profiles import load_profiles, save_profiles, load_settings, save_settings
 from . import __version__
 
@@ -31,6 +31,8 @@ from .dialogs import BuildDialog, SettingsDialog, ProfileDialog
 from .services import (
     log_color, validate_ovpn, extract_remote_host,
     export_profile_zip, import_profile_zip, fetch_keepass_creds,
+    elevate_command, kill_command, fetch_public_ip, dns_resolver_ip,
+    is_autostart_enabled, enable_autostart, disable_autostart,
 )
 
 log = logging.getLogger(__name__)
@@ -340,7 +342,7 @@ class VPNLauncher(QMainWindow):
         hamburger_menu.addSeparator()
         self.action_autostart = QAction("Start at &Login", self)
         self.action_autostart.setCheckable(True)
-        self.action_autostart.setChecked(AUTOSTART_DESKTOP.is_file())
+        self.action_autostart.setChecked(is_autostart_enabled())
         self.action_autostart.triggered.connect(self._toggle_autostart)
         hamburger_menu.addAction(self.action_autostart)
         hamburger_menu.addAction(self.action_settings)
@@ -447,18 +449,9 @@ class VPNLauncher(QMainWindow):
 
     def _toggle_autostart(self, checked):
         if checked:
-            AUTOSTART_DIR.mkdir(parents=True, exist_ok=True)
-            desktop = (
-                "[Desktop Entry]\nType=Application\nName=VPN Launcher\n"
-                "Exec=ovpn-app\nIcon=ovpn-launcher\nTerminal=false\n"
-                "X-GNOME-Autostart-enabled=true\n"
-            )
-            AUTOSTART_DESKTOP.write_text(desktop)
+            enable_autostart()
         else:
-            try:
-                AUTOSTART_DESKTOP.unlink()
-            except FileNotFoundError:
-                pass
+            disable_autostart()
 
     def _open_folder(self, path):
         path.mkdir(parents=True, exist_ok=True)
@@ -722,19 +715,16 @@ class VPNLauncher(QMainWindow):
 
     def on_dns_check(self):
         self._log_append("-- Checking DNS resolver... --")
-        proc = QProcess(self)
-        proc.setProgram("dig")
-        proc.setArguments(["+short", "whoami.akamai.net", "@ns1-1.akamaitech.net"])
-        proc.finished.connect(lambda code, _s, p=proc: self._on_dns_check_finished(p, code))
-        proc.start()
-
-    def _on_dns_check_finished(self, proc, exit_code):
-        if exit_code == 0:
-            ip = proc.readAllStandardOutput().data().decode().strip()
-            self._log_append(f"-- DNS resolver: {ip or 'unknown'} --")
-        else:
-            self._log_append("-- DNS check failed (is 'dig' installed?) --")
-        proc.deleteLater()
+        import threading
+        def _run():
+            ip = dns_resolver_ip()
+            from PyQt6.QtCore import QMetaObject, Qt as QtConst, Q_ARG
+            msg = f"-- DNS resolver: {ip or 'unknown'} --"
+            QMetaObject.invokeMethod(
+                self.log_output, "append", QtConst.ConnectionType.QueuedConnection,
+                Q_ARG(str, msg),
+            )
+        threading.Thread(target=_run, daemon=True).start()
 
     # ── Profile Loading ──────────────────────────────────────────────
 
@@ -864,8 +854,8 @@ class VPNLauncher(QMainWindow):
             args += ["--auth-user-pass", self.auth_file.name]
 
         self.process = QProcess(self)
-        self.process.setProgram("pkexec")
-        self.process.setArguments([binary] + args)
+        self.process.setProgram(elevate_command([binary], gui=True)[0])
+        self.process.setArguments(elevate_command([binary], gui=True)[1:] + args)
         self.process.setProcessChannelMode(QProcess.ProcessChannelMode.MergedChannels)
         self.process.readyReadStandardOutput.connect(self._on_read_output)
         self.process.finished.connect(self._on_process_finished)
@@ -895,7 +885,7 @@ class VPNLauncher(QMainWindow):
         if self.process and self.process.state() != QProcess.ProcessState.NotRunning:
             pid = self.process.processId()
             if pid:
-                subprocess.run(["pkexec", "kill", str(pid)], capture_output=True)
+                subprocess.run(kill_command(pid, gui=True), capture_output=True)
             self.process.kill()
             self.process.waitForFinished(3000)
         self._cleanup()
@@ -1067,26 +1057,25 @@ class VPNLauncher(QMainWindow):
         self.status_text.setText(f"Connected: {self.connected_alias} — {h:02d}:{m:02d}:{s:02d}")
 
     def _fetch_public_ip(self, notify=False):
-        proc = QProcess(self)
-        proc.setProgram("curl")
+        import threading
         ip_service = self._app_settings.get("ip_service", "https://api.ipify.org")
-        proc.setArguments(["-s", "--max-time", "5", ip_service])
-        proc.finished.connect(lambda code, _status, p=proc, n=notify: self._on_ip_fetched(p, code, n))
-        proc.start()
+        def _run():
+            ip = fetch_public_ip(ip_service)
+            from PyQt6.QtCore import QMetaObject, Qt as QtConst, Q_ARG
+            QMetaObject.invokeMethod(
+                self._ip_label, "setText", QtConst.ConnectionType.QueuedConnection,
+                Q_ARG(str, f"IP: {ip}" if ip else "IP: —"),
+            )
+            if notify:
+                QTimer.singleShot(0, lambda i=ip: self._on_ip_notify(i))
+        threading.Thread(target=_run, daemon=True).start()
 
-    def _on_ip_fetched(self, proc, exit_code, notify=False):
-        if exit_code == 0:
-            ip = proc.readAllStandardOutput().data().decode().strip()
-            self._ip_label.setText(f"IP: {ip}" if ip else "IP: —")
-        else:
-            ip = ""
-            self._ip_label.setText("IP: —")
-        if notify and self.state == self.STATE_CONNECTED:
+    def _on_ip_notify(self, ip):
+        if self.state == self.STATE_CONNECTED:
             msg = f"Connected to {self.connected_alias}"
             if ip:
                 msg += f" — IP: {ip}"
             self.tray.showMessage("VPN Connected", msg, QSystemTrayIcon.MessageIcon.Information, 3000)
-        proc.deleteLater()
 
     def _restore_geometry(self):
         if self.settings.contains("geometry"):
