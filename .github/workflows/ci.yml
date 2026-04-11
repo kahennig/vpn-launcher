@@ -20,7 +20,7 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y libegl1
-          pip install PyQt6>=6.5 pytest pytest-qt
+          pip install "PyQt6>=6.5" "pyyaml>=6.0" pytest pytest-qt
 
       - name: Install package
         run: pip install -e .

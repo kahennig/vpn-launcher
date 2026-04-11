@@ -92,7 +92,7 @@ class TestProfileDialogValidation:
             mock_accept.assert_called_once()
 
 
-from ovpn_launcher.app import SettingsDialog, VPNLauncher
+from ovpn_launcher.app import ProfileDialog, SettingsDialog
 from ovpn_launcher.profiles import DEFAULT_SETTINGS
 
 
@@ -161,7 +161,7 @@ class TestSettingsDialog:
 
 
 class TestVPNLauncherReload:
-    def test_reload_populates_tree(self, qtbot, tmp_path):
+    def test_reload_populates_tree(self, qtbot, tmp_path, monkeypatch):
         import ovpn_launcher.profiles as mod
         conf = tmp_path / "config.yaml"
         conf.write_text(
@@ -173,40 +173,42 @@ class TestVPNLauncherReload:
             "    version: '2.6.14'\n"
             "    config: /test2.ovpn\n"
         )
-        orig = mod.CONFIG_YAML
-        mod.CONFIG_YAML = conf
-        try:
-            w = VPNLauncher()
-            qtbot.addWidget(w)
-            assert w.profile_tree.topLevelItemCount() == 2
-            assert w.profile_tree.topLevelItem(0).text(0) == "test1"
-            assert w.profile_tree.topLevelItem(1).text(0) == "test2"
-        finally:
-            mod.CONFIG_YAML = orig
+        monkeypatch.setattr(mod, "CONFIG_YAML", conf)
+        from ovpn_launcher.app import VPNLauncher
+        w = VPNLauncher()
+        qtbot.addWidget(w)
+        assert w.profile_tree.topLevelItemCount() == 2
+        assert w.profile_tree.topLevelItem(0).text(0) == "test1"
+        assert w.profile_tree.topLevelItem(1).text(0) == "test2"
 
 
 class TestLogColor:
     def test_error_red(self, qtbot):
+        from ovpn_launcher.app import VPNLauncher
         w = VPNLauncher()
         qtbot.addWidget(w)
         assert w._log_color("ERROR: something failed") == "#e74c3c"
 
     def test_fatal_red(self, qtbot):
+        from ovpn_launcher.app import VPNLauncher
         w = VPNLauncher()
         qtbot.addWidget(w)
         assert w._log_color("FATAL: crash") == "#e74c3c"
 
     def test_warn_orange(self, qtbot):
+        from ovpn_launcher.app import VPNLauncher
         w = VPNLauncher()
         qtbot.addWidget(w)
         assert w._log_color("WARNING: something") == "#e67e22"
 
     def test_success_green(self, qtbot):
+        from ovpn_launcher.app import VPNLauncher
         w = VPNLauncher()
         qtbot.addWidget(w)
         assert w._log_color("Initialization Sequence Completed") == "#27ae60"
 
     def test_internal_muted(self, qtbot):
+        from ovpn_launcher.app import VPNLauncher
         w = VPNLauncher()
         qtbot.addWidget(w)
         color = w._log_color("-- Reconnecting in 5 seconds... --")
@@ -214,6 +216,7 @@ class TestLogColor:
         assert color != "#e74c3c"
 
     def test_normal_none(self, qtbot):
+        from ovpn_launcher.app import VPNLauncher
         w = VPNLauncher()
         qtbot.addWidget(w)
         assert w._log_color("some regular openvpn output") is None
