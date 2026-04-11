@@ -3,7 +3,7 @@
 ## Prerequisites
 
 - Python 3.10+ (system has 3.14)
-- PyQt6 (`pip install PyQt6` or system package)
+- PyQt6, PyYAML
 - `keepassxc-cli` (optional, for KeePass integration)
 - KDE Plasma desktop (for system tray icons; works on other DEs but icons may differ)
 
@@ -20,14 +20,15 @@ make install-config  # creates ~/.config/ovpn-launcher/ with example config
 ```bash
 # GUI
 ovpn-app
-# or directly:
-python -m ovpn_launcher.app
 
 # CLI
-./scripts/ovpn-connect --list
-./scripts/ovpn-connect <alias>
-./scripts/ovpn-connect --add
-./scripts/ovpn-connect --status
+ovpn-connect --list
+ovpn-connect <alias>
+ovpn-connect --add
+ovpn-connect --edit <alias>
+ovpn-connect --remove <alias>
+ovpn-connect --status
+ovpn-connect --version
 ```
 
 ## Testing
@@ -37,15 +38,20 @@ pip install pytest pytest-qt
 python -m pytest tests/ -v
 ```
 
-Tests cover `profiles.py`: load, save, detect_versions, auth_mode parsing, header preservation.
+58 tests covering:
+- `test_profiles.py` — YAML load/save, settings, migration, detect_versions, backup, last_connected
+- `test_paths.py` — openvpn_binary, path constants, custom prefix
+- `test_app.py` — ProfileDialog (validation, keepass_entry visibility, get_profile), SettingsDialog (prefill, get_settings, defaults), VPNLauncher (reload_profiles), log colors
 
 CI runs automatically on push/PR via GitHub Actions (`.github/workflows/ci.yml`).
 
 ## Building OpenVPN Versions
 
+From the GUI: **Build OpenVPN** button fetches versions from GitHub and handles everything.
+
+From the command line:
 ```bash
 sudo ./scripts/build-openvpn.sh 2.6.14
-sudo ./scripts/build-openvpn.sh 2.5.11
 ```
 
 Build dependencies (Fedora):
@@ -61,7 +67,7 @@ sudo apt install build-essential libssl-dev liblzo2-dev libpam0g-dev liblz4-dev
 ## Install / Uninstall
 
 ```bash
-sudo make install    # installs to /usr/local/bin + .desktop file
+sudo make install    # pip install + .desktop + icon
 sudo make uninstall  # removes everything
 ```
 
@@ -69,39 +75,47 @@ sudo make uninstall  # removes everything
 
 ```
 src/ovpn_launcher/
-  __init__.py      # version string
-  paths.py         # all path constants, XDG config, openvpn_binary() helper
-  profiles.py      # load/save profiles, detect_versions()
-  app.py           # PyQt6 GUI — ProfileDialog, VPNLauncher, main()
+  __init__.py       # version string
+  app.py            # PyQt6 GUI — BuildDialog, SettingsDialog, ProfileDialog, VPNLauncher, main()
+  cli.py            # Python CLI — argparse, connect, add, edit, remove, list, status
+  builder.py        # OpenVPN build — fetch versions (GitHub API), download, compile, install
+  paths.py          # path constants, XDG config, openvpn_binary()
+  profiles.py       # YAML config: load/save profiles, settings, migration, detect_versions
 
 scripts/
-  ovpn-connect     # bash CLI (installed to /usr/local/bin/)
-  build-openvpn.sh # compile any OpenVPN version from source
+  ovpn-connect      # legacy bash CLI (kept for reference)
+  build-openvpn.sh  # OpenVPN build script (bash, still usable standalone)
 
 tests/
-  test_profiles.py # pytest tests for profiles.py
+  test_app.py       # GUI tests (ProfileDialog, SettingsDialog, VPNLauncher, log colors)
+  test_paths.py     # path and binary resolution tests
+  test_profiles.py  # YAML config, settings, migration, backup tests
 
 config/
-  connections.conf.example  # template copied during make install-config
+  config.yaml.example       # YAML config template
+  connections.conf.example   # legacy format reference
 
-share/applications/
-  ovpn-launcher.desktop     # freedesktop .desktop entry
+share/
+  applications/ovpn-launcher.desktop
+  icons/ovpn-launcher.svg    # custom app icon
 
 .github/workflows/
-  ci.yml           # GitHub Actions CI (pytest + xvfb)
+  ci.yml            # GitHub Actions CI (pytest + xvfb)
+
+openspec/
+  backlog.md        # task index with Windows port roadmap
+  done/             # completed task specs
+  active/           # tasks in progress
 
 docs/
-  architecture.md  # component diagram, connection flow, config format
-  migration.md     # history of migration from ~/bin + ~/vpn
-  development.md   # this file
-  user-guide.md    # end-user guide
+  architecture.md   # component diagram, connection flow, config format
+  development.md    # this file
+  migration.md      # history of migration from ~/bin + ~/vpn
+  user-guide.md     # end-user guide
 ```
 
 ## TODO / Future Ideas
 
 - [ ] Add a LICENSE file (GPL-3.0 full text)
-- [ ] Publish to GitHub and update YOURUSER in pyproject.toml and README.md
-- [ ] Multiple simultaneous VPN connections
-- [ ] KeePass master password caching with timeout
-- [ ] Packaging as RPM/Flatpak
-- [ ] Custom app icon instead of relying on theme icons
+- [ ] Packaging as RPM/Flatpak (L016)
+- [ ] Windows port (see openspec/backlog.md for roadmap: T064-T069, W001-W010)
