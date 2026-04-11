@@ -18,7 +18,7 @@ from PyQt6.QtWidgets import (
     QTreeWidget, QTreeWidgetItem, QPushButton, QLabel, QSystemTrayIcon,
     QMenu, QInputDialog, QLineEdit, QMessageBox, QTextEdit, QSplitter,
     QToolBar, QStatusBar, QHeaderView, QDialog, QTabWidget,
-    QFileDialog, QToolButton, QSplashScreen, QTextBrowser,
+    QFileDialog, QToolButton, QSplashScreen, QTextBrowser, QStyle,
 )
 
 from .paths import openvpn_binary
@@ -36,6 +36,16 @@ from .services import (
 )
 
 log = logging.getLogger(__name__)
+
+SP = QStyle.StandardPixmap
+
+
+def _themed_icon(name, fallback_sp=None):
+    """Return a themed icon with optional QStyle fallback for Windows."""
+    icon = QIcon.fromTheme(name)
+    if icon.isNull() and fallback_sp is not None:
+        icon = QApplication.style().standardIcon(fallback_sp)
+    return icon
 
 
 
@@ -85,81 +95,81 @@ class VPNLauncher(QMainWindow):
     # ── Actions ──────────────────────────────────────────────────────
 
     def _setup_actions(self):
-        self.action_connect = QAction(QIcon.fromTheme("network-connect"), "&Connect", self)
+        self.action_connect = QAction(_themed_icon("network-connect", SP.SP_MediaPlay), "&Connect", self)
         self.action_connect.setShortcut(QKeySequence("Ctrl+Return"))
         self.action_connect.setToolTip("Connect to selected profile (Ctrl+Enter)")
         self.action_connect.triggered.connect(self.on_connect)
 
-        self.action_disconnect = QAction(QIcon.fromTheme("network-disconnect"), "&Disconnect", self)
+        self.action_disconnect = QAction(_themed_icon("network-disconnect", SP.SP_MediaStop), "&Disconnect", self)
         self.action_disconnect.setShortcut(QKeySequence("Ctrl+D"))
         self.action_disconnect.setToolTip("Disconnect (Ctrl+D)")
         self.action_disconnect.triggered.connect(self.on_disconnect)
 
-        self.action_reload = QAction(QIcon.fromTheme("view-refresh"), "&Reload Profiles", self)
+        self.action_reload = QAction(_themed_icon("view-refresh", SP.SP_BrowserReload), "&Reload Profiles", self)
         self.action_reload.setShortcut(QKeySequence.StandardKey.Refresh)
         self.action_reload.setToolTip("Reload profiles from config.yaml")
         self.action_reload.triggered.connect(self.reload_profiles)
 
-        self.action_clear_log = QAction(QIcon.fromTheme("edit-clear-history"), "Clear &Log", self)
+        self.action_clear_log = QAction(_themed_icon("edit-clear-history", SP.SP_DialogResetButton), "Clear &Log", self)
         self.action_clear_log.setShortcut(QKeySequence("Ctrl+L"))
         self.action_clear_log.triggered.connect(lambda: self.log_output.clear())
 
-        self.action_copy_log = QAction(QIcon.fromTheme("edit-copy"), "Copy Lo&g", self)
+        self.action_copy_log = QAction(_themed_icon("edit-copy", SP.SP_FileIcon), "Copy Lo&g", self)
         self.action_copy_log.setShortcut(QKeySequence("Ctrl+Shift+C"))
         self.action_copy_log.setToolTip("Copy log to clipboard (Ctrl+Shift+C)")
         self.action_copy_log.triggered.connect(
             lambda: QApplication.clipboard().setText(self.log_output.toPlainText())
         )
 
-        self.action_add = QAction(QIcon.fromTheme("list-add"), "&Add Profile", self)
+        self.action_add = QAction(_themed_icon("list-add", SP.SP_FileDialogNewFolder), "&Add Profile", self)
         self.action_add.setShortcut(QKeySequence("Ctrl+N"))
         self.action_add.setToolTip("Add a new VPN profile (Ctrl+N)")
         self.action_add.triggered.connect(self.on_add_profile)
 
-        self.action_import = QAction(QIcon.fromTheme("document-import"), "&Import .ovpn", self)
+        self.action_import = QAction(_themed_icon("document-import", SP.SP_DialogOpenButton), "&Import .ovpn", self)
         self.action_import.setToolTip("Import an .ovpn file as a new profile")
         self.action_import.triggered.connect(self.on_import_ovpn)
 
-        self.action_import_zip = QAction(QIcon.fromTheme("package-x-generic"), "I&mport Profile", self)
+        self.action_import_zip = QAction(_themed_icon("package-x-generic", SP.SP_DialogOpenButton), "I&mport Profile", self)
         self.action_import_zip.setToolTip("Import a profile from exported .zip")
         self.action_import_zip.triggered.connect(self.on_import_zip)
 
-        self.action_edit = QAction(QIcon.fromTheme("document-edit"), "&Edit Profile", self)
+        self.action_edit = QAction(_themed_icon("document-edit", SP.SP_FileDialogDetailedView), "&Edit Profile", self)
         self.action_edit.setShortcut(QKeySequence("Ctrl+E"))
         self.action_edit.setToolTip("Edit selected profile (Ctrl+E)")
         self.action_edit.triggered.connect(self.on_edit_profile)
 
-        self.action_remove = QAction(QIcon.fromTheme("list-remove"), "&Remove Profile", self)
+        self.action_remove = QAction(_themed_icon("list-remove", SP.SP_DialogCancelButton), "&Remove Profile", self)
         self.action_remove.setShortcut(QKeySequence("Delete"))
         self.action_remove.setToolTip("Remove selected profile (Delete)")
         self.action_remove.triggered.connect(self.on_remove_profile)
 
-        self.action_export = QAction(QIcon.fromTheme("document-export"), "E&xport Profile", self)
+        self.action_export = QAction(_themed_icon("document-export", SP.SP_DialogSaveButton), "E&xport Profile", self)
         self.action_export.setToolTip("Export selected profile as .zip")
         self.action_export.triggered.connect(self.on_export_profile)
 
-        self.action_ping = QAction(QIcon.fromTheme("network-wired"), "&Ping Server", self)
+        self.action_ping = QAction(_themed_icon("network-wired", SP.SP_DriveNetIcon), "&Ping Server", self)
         self.action_ping.setToolTip("Ping VPN server to check latency")
         self.action_ping.triggered.connect(self.on_ping_profile)
 
-        self.action_dns_check = QAction(QIcon.fromTheme("network-server"), "&DNS Check", self)
+        self.action_dns_check = QAction(_themed_icon("network-server", SP.SP_DriveNetIcon), "&DNS Check", self)
         self.action_dns_check.setToolTip("Check DNS resolver (leak test)")
         self.action_dns_check.triggered.connect(self.on_dns_check)
 
-        self.action_build = QAction(QIcon.fromTheme("run-build"), "Build Open&VPN", self)
+        self.action_build = QAction(_themed_icon("run-build", SP.SP_CommandLink), "Build Open&VPN", self)
         self.action_build.setToolTip("Download and compile an OpenVPN version")
         self.action_build.triggered.connect(self._show_build_dialog)
 
-        self.action_open_configs = QAction(QIcon.fromTheme("folder-open"), "Open Configs Folder", self)
+        self.action_open_configs = QAction(_themed_icon("folder-open", SP.SP_DirOpenIcon), "Open Configs Folder", self)
         self.action_open_configs.triggered.connect(lambda: self._open_folder(CONFIG_DIR / "configs"))
 
-        self.action_open_logs = QAction(QIcon.fromTheme("folder-open"), "Open Logs Folder", self)
+        self.action_open_logs = QAction(_themed_icon("folder-open", SP.SP_DirOpenIcon), "Open Logs Folder", self)
         self.action_open_logs.triggered.connect(lambda: self._open_folder(LOG_DIR))
 
-        self.action_about = QAction(QIcon.fromTheme("help-about"), "&About VPN Launcher", self)
+        self.action_about = QAction(_themed_icon("help-about", SP.SP_MessageBoxInformation), "&About VPN Launcher", self)
         self.action_about.triggered.connect(self._show_about)
 
-        self.action_settings = QAction(QIcon.fromTheme("configure"), "&Settings", self)
+        self.action_settings = QAction(_themed_icon("configure", SP.SP_FileDialogDetailedView), "&Settings", self)
         self.action_settings.triggered.connect(self._show_settings)
 
         self.action_search_log = QAction("Find in Log", self)
@@ -167,7 +177,7 @@ class VPNLauncher(QMainWindow):
         self.action_search_log.triggered.connect(self._toggle_search_bar)
         self.addAction(self.action_search_log)
 
-        self.action_quit = QAction(QIcon.fromTheme("application-exit"), "&Quit", self)
+        self.action_quit = QAction(_themed_icon("application-exit", SP.SP_DialogCloseButton), "&Quit", self)
         self.action_quit.setShortcut(QKeySequence.StandardKey.Quit)
         self.action_quit.triggered.connect(self.quit_app)
 
@@ -350,7 +360,7 @@ class VPNLauncher(QMainWindow):
         hamburger_menu.addAction(self.action_about)
         hamburger_menu.addAction(self.action_quit)
         hamburger_btn = QToolButton(self)
-        hamburger_btn.setIcon(QIcon.fromTheme("application-menu", QIcon.fromTheme("open-menu-symbolic")))
+        hamburger_btn.setIcon(_themed_icon("application-menu", SP.SP_ToolBarHorizontalExtensionButton))
         hamburger_btn.setMenu(hamburger_menu)
         hamburger_btn.setPopupMode(QToolButton.ToolButtonPopupMode.InstantPopup)
         hamburger_btn.setToolTip("Menu")
@@ -528,10 +538,10 @@ class VPNLauncher(QMainWindow):
             menu.addAction(action)
         if getattr(self, "profiles", []):
             menu.addSeparator()
-        show_action = QAction(QIcon.fromTheme("window"), "Show / Hide", self)
+        show_action = QAction(_themed_icon("window", SP.SP_TitleBarNormalButton), "Show / Hide", self)
         show_action.triggered.connect(self._toggle_window)
         menu.addAction(show_action)
-        self.tray_disconnect_action = QAction(QIcon.fromTheme("network-disconnect"), "Disconnect", self)
+        self.tray_disconnect_action = QAction(_themed_icon("network-disconnect", SP.SP_MediaStop), "Disconnect", self)
         self.tray_disconnect_action.triggered.connect(self.on_disconnect)
         self.tray_disconnect_action.setEnabled(is_connected)
         menu.addAction(self.tray_disconnect_action)
@@ -747,7 +757,7 @@ class VPNLauncher(QMainWindow):
             if not Path(p["config"]).is_file():
                 warnings.append(f"Config not found: {p['config']}")
             if warnings:
-                item.setIcon(0, QIcon.fromTheme("dialog-warning"))
+                item.setIcon(0, _themed_icon("dialog-warning", SP.SP_MessageBoxWarning))
                 item.setToolTip(0, "\n".join(warnings))
             else:
                 item.setIcon(0, _app_icon())
@@ -1006,7 +1016,7 @@ class VPNLauncher(QMainWindow):
         self.status_text.setText(label)
         self.status_text.setStyleSheet(f"color: {color.name()};")
 
-        icon = QIcon.fromTheme(tray_icon, _app_icon())
+        icon = _themed_icon(tray_icon, SP.SP_DriveNetIcon)
         self.status_icon.setPixmap(icon.pixmap(16, 16))
 
         self.tray.setIcon(icon)
@@ -1044,7 +1054,7 @@ class VPNLauncher(QMainWindow):
             for col in range(item.columnCount()):
                 item.setFont(col, font)
             if is_active and state == self.STATE_CONNECTING:
-                item.setIcon(0, QIcon.fromTheme("network-vpn-acquiring"))
+                item.setIcon(0, _themed_icon("network-vpn-acquiring", SP.SP_BrowserReload))
             else:
                 item.setIcon(0, _app_icon())
 
@@ -1107,13 +1117,22 @@ class VPNLauncher(QMainWindow):
 
 
 def _app_icon():
+    # PyInstaller bundled
+    if hasattr(sys, '_MEIPASS'):
+        bundled = Path(sys._MEIPASS) / "share" / "icons" / "ovpn-launcher.svg"
+        if bundled.is_file():
+            return QIcon(str(bundled))
+        bundled_ico = Path(sys._MEIPASS) / "share" / "icons" / "ovpn-launcher.ico"
+        if bundled_ico.is_file():
+            return QIcon(str(bundled_ico))
+    # Development / pip install
     custom = Path(__file__).parent.parent.parent / "share" / "icons" / "ovpn-launcher.svg"
     if custom.is_file():
         return QIcon(str(custom))
     installed = Path("/usr/local/share/icons/ovpn-launcher.svg")
     if installed.is_file():
         return QIcon(str(installed))
-    return QIcon.fromTheme("ovpn-launcher", QIcon.fromTheme("network-vpn"))
+    return _themed_icon("ovpn-launcher", SP.SP_DriveNetIcon)
 
 
 def main():

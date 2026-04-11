@@ -10,7 +10,8 @@ from PyQt6.QtWidgets import (
     QTextEdit, QVBoxLayout,
 )
 
-from .builder import fetch_available_versions, installed_versions, build_openvpn
+from .builder import fetch_available_versions, installed_versions, build_openvpn, has_tap_driver
+from .paths import IS_WINDOWS
 from .profiles import detect_versions, VALID_AUTH_MODES
 
 
@@ -28,10 +29,17 @@ class BuildDialog(QDialog):
         self.version_combo.setEditable(True)
         self.version_combo.addItem("Loading versions...")
         row.addWidget(self.version_combo)
-        self.build_btn = QPushButton("Build")
+        self.build_btn = QPushButton("Install" if IS_WINDOWS else "Build")
         self.build_btn.clicked.connect(self._start_build)
         row.addWidget(self.build_btn)
         layout.addLayout(row)
+
+        self.full_install_cb = None
+        if IS_WINDOWS:
+            from PyQt6.QtWidgets import QCheckBox
+            self.full_install_cb = QCheckBox("Full install (includes TAP/TUN driver)")
+            self.full_install_cb.setChecked(not has_tap_driver())
+            layout.addWidget(self.full_install_cb)
 
         self.output = QTextEdit()
         self.output.setReadOnly(True)
@@ -70,7 +78,8 @@ class BuildDialog(QDialog):
         self.output.clear()
 
         def run():
-            build_openvpn(version, self.prefix, on_output=self._append_output)
+            full = self.full_install_cb.isChecked() if self.full_install_cb else False
+            build_openvpn(version, self.prefix, on_output=self._append_output, full_install=full)
             self._build_done()
         threading.Thread(target=run, daemon=True).start()
 
