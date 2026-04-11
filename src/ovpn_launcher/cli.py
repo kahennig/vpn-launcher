@@ -13,6 +13,7 @@ from pathlib import Path
 from . import __version__
 from .paths import openvpn_binary
 from .profiles import load_profiles, save_profiles, load_settings, detect_versions, VALID_AUTH_MODES
+from .services import elevate_command
 
 
 def cmd_list(settings):
@@ -181,7 +182,7 @@ def cmd_connect(alias=None, version=None, config=None):
     print(f"Connecting with OpenVPN {version} ({binary})")
     print(f"Config: {config}")
 
-    args = ["sudo", str(binary), "--config", config]
+    args = elevate_command([str(binary), "--config", config])
     user, pwd = get_credentials(alias or "", auth_mode, keepass_entry, settings)
     auth_file = None
     if user and pwd:

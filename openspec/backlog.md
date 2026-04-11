@@ -86,12 +86,12 @@
 
 | ID | Tarea | Estado | Justificación |
 |----|-------|--------|---------------|
-| T064 | Módulo platform.py — abstracción de rutas | ⚪ BACKLOG | Centralizar rutas XDG (Linux) vs %APPDATA% (Windows) |
-| T065 | Abstracción de escalación de privilegios | ⚪ BACKLOG | pkexec (Linux) vs runas/UAC (Windows) |
-| T066 | Abstracción de detección de binarios OpenVPN | ⚪ BACKLOG | /opt/ (Linux) vs Program Files (Windows) |
-| T067 | Reemplazar curl/dig por Python stdlib | ⚪ BACKLOG | IP check y DNS check sin dependencias externas |
-| T068 | Abstracción de autostart | ⚪ BACKLOG | .desktop (Linux) vs Registry/Startup folder (Windows) |
-| T069 | Tests cross-platform | ⚪ BACKLOG | Asegurar que los tests no dependen de paths Linux |
+| T064 | Módulo platform.py — abstracción de rutas | ✅ DONE | Centralizar rutas XDG (Linux) vs %APPDATA% (Windows) |
+| T065 | Abstracción de escalación de privilegios | ✅ DONE | pkexec (Linux) vs runas/UAC (Windows) |
+| T066 | Abstracción de detección de binarios OpenVPN | ✅ DONE | /opt/ (Linux) vs Program Files (Windows) |
+| T067 | Reemplazar curl/dig por Python stdlib | ✅ DONE | IP check y DNS check sin dependencias externas |
+| T068 | Abstracción de autostart | ✅ DONE | .desktop (Linux) vs Registry/Startup folder (Windows) |
+| T069 | Tests cross-platform | ✅ DONE | Asegurar que los tests no dependen de paths Linux |
 
 ### Fase 2: Soporte Windows
 

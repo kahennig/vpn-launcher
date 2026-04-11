@@ -197,8 +197,9 @@ class TestDetectVersions:
         assert isinstance(versions, list)
 
     def test_system_included_if_exists(self):
+        from ovpn_launcher.paths import openvpn_binary
         versions = detect_versions()
-        if Path("/usr/bin/openvpn").is_file():
+        if openvpn_binary("system").is_file():
             assert any(v.startswith("system") for v in versions)
 
 

@@ -1,5 +1,6 @@
 """Tests for ovpn_launcher.services (pure logic, no Qt)."""
 
+import socket
 import subprocess
 import zipfile
 from pathlib import Path
@@ -11,6 +12,8 @@ import yaml
 from ovpn_launcher.services import (
     log_color, validate_ovpn, extract_remote_host,
     export_profile_zip, import_profile_zip, fetch_keepass_creds,
+    elevate_command, kill_command, fetch_public_ip, dns_resolver_ip,
+    is_autostart_enabled, enable_autostart, disable_autostart,
 )
 
 
@@ -203,3 +206,74 @@ class TestFetchKeepassCreds:
         db.write_bytes(b"fake")
         user, pwd = fetch_keepass_creds("entry", str(db), "master")
         assert user is None and pwd is None
+
+
+class TestElevateCommand:
+    @patch("ovpn_launcher.services.IS_WINDOWS", False)
+    def test_linux_gui(self):
+        assert elevate_command(["openvpn", "--config", "x"], gui=True) == ["pkexec", "openvpn", "--config", "x"]
+
+    @patch("ovpn_launcher.services.IS_WINDOWS", False)
+    def test_linux_cli(self):
+        assert elevate_command(["openvpn", "--config", "x"], gui=False) == ["sudo", "openvpn", "--config", "x"]
+
+    @patch("ovpn_launcher.services.IS_WINDOWS", True)
+    def test_windows(self):
+        assert elevate_command(["openvpn", "--config", "x"], gui=True) == ["openvpn", "--config", "x"]
+
+
+class TestKillCommand:
+    @patch("ovpn_launcher.services.IS_WINDOWS", False)
+    def test_linux_gui(self):
+        assert kill_command(1234, gui=True) == ["pkexec", "kill", "1234"]
+
+    @patch("ovpn_launcher.services.IS_WINDOWS", False)
+    def test_linux_cli(self):
+        assert kill_command(1234, gui=False) == ["sudo", "kill", "1234"]
+
+    @patch("ovpn_launcher.services.IS_WINDOWS", True)
+    def test_windows(self):
+        assert kill_command(1234) == ["taskkill", "/F", "/PID", "1234"]
+
+
+class TestFetchPublicIp:
+    @patch("ovpn_launcher.services.urlopen")
+    def test_success(self, mock_urlopen):
+        mock_resp = MagicMock()
+        mock_resp.read.return_value = b"1.2.3.4"
+        mock_resp.__enter__ = lambda s: s
+        mock_resp.__exit__ = MagicMock(return_value=False)
+        mock_urlopen.return_value = mock_resp
+        assert fetch_public_ip() == "1.2.3.4"
+
+    @patch("ovpn_launcher.services.urlopen", side_effect=OSError("fail"))
+    def test_failure(self, mock_urlopen):
+        assert fetch_public_ip() == ""
+
+
+class TestDnsResolverIp:
+    @patch("ovpn_launcher.services.socket.getaddrinfo", return_value=[(2, 1, 6, "", ("9.9.9.9", 0))])
+    def test_success(self, mock_gai):
+        assert dns_resolver_ip() == "9.9.9.9"
+
+    @patch("ovpn_launcher.services.socket.getaddrinfo", side_effect=socket.gaierror("fail"))
+    def test_failure(self, mock_gai):
+        assert dns_resolver_ip() == ""
+
+
+class TestAutostart:
+    def test_enable_disable_cycle(self, tmp_path):
+        autostart_file = tmp_path / "autostart" / "test.desktop"
+        with patch("ovpn_launcher.services.AUTOSTART_DIR", tmp_path / "autostart"), \
+             patch("ovpn_launcher.services.AUTOSTART_FILE", autostart_file):
+            assert not is_autostart_enabled()
+            enable_autostart()
+            assert is_autostart_enabled()
+            assert autostart_file.is_file()
+            disable_autostart()
+            assert not is_autostart_enabled()
+
+    def test_disable_when_not_enabled(self, tmp_path):
+        autostart_file = tmp_path / "nonexistent"
+        with patch("ovpn_launcher.services.AUTOSTART_FILE", autostart_file):
+            disable_autostart()  # should not raise

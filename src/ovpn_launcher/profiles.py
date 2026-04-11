@@ -5,7 +5,7 @@ import subprocess
 
 import yaml
 
-from .paths import CONNECTIONS_CONF, CONFIG_YAML, OPENVPN_PREFIX
+from .paths import CONNECTIONS_CONF, CONFIG_YAML, OPENVPN_PREFIX, OPENVPN_GLOB, openvpn_binary
 
 VALID_AUTH_MODES = ("none", "keepass", "prompt")
 
@@ -114,15 +114,16 @@ def migrate_legacy_config(legacy_path=None, yaml_path=None):
 def detect_versions(prefix=None):
     p = Path(prefix) if prefix else OPENVPN_PREFIX
     versions = []
-    if Path("/usr/bin/openvpn").is_file():
+    system_bin = openvpn_binary("system")
+    if system_bin.is_file():
         try:
             ver = subprocess.run(
-                ["/usr/bin/openvpn", "--version"], capture_output=True, text=True
+                [str(system_bin), "--version"], capture_output=True, text=True
             ).stdout.split()[1]
         except Exception:
             ver = "?"
         versions.append(f"system ({ver})")
-    for d in sorted(p.glob("openvpn-*/sbin/openvpn")):
+    for d in sorted(p.glob(OPENVPN_GLOB)):
         if d.is_file():
             versions.append(d.parent.parent.name.removeprefix("openvpn-"))
     return versions
