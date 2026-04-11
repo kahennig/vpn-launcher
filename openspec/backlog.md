@@ -43,61 +43,63 @@
 | T038 | Campo KeePass entry independiente | ✅ DONE |
 | T039 | Renombrar y reagrupar acciones toolbar/hamburger | ✅ DONE |
 | T040 | Marcar conexión activa en menú del tray | ✅ DONE |
+| T041 | Migrar config a YAML | ✅ DONE |
+| T042 | Pantalla de configuración (Settings) | ✅ DONE |
+| T043 | Migrar CLI a Python | ✅ DONE |
+| T044 | Columna KeePass entry en el tree | ✅ DONE |
+| T045 | Atajos de teclado Add/Edit/Remove | ✅ DONE |
+| T046 | Colores de estado en el log | ✅ DONE |
+| T047 | Notificación con IP al conectar | ✅ DONE |
+| T048 | Retry con backoff en auto-reconnect | ✅ DONE |
+| T049 | Validar .ovpn antes de conectar | ✅ DONE |
+| T050 | Backup de config.yaml antes de guardar | ✅ DONE |
+| T051 | Última conexión exitosa por perfil | ✅ DONE |
+| T052 | Abrir carpeta de configs en file manager | ✅ DONE |
+| T053 | Abrir carpeta de logs en file manager | ✅ DONE |
+| T054 | Doble-click en log copia la línea | ✅ DONE |
+| T055 | Contador de perfiles en status bar | ✅ DONE |
+| T056 | CLI --remove | ✅ DONE |
+| T057 | CLI --edit | ✅ DONE |
+| T058 | CLI --version | ✅ DONE |
+| T059 | Ícono custom de la app | ✅ DONE |
+| T060 | Splash screen mínimo | ✅ DONE |
+| T061 | Fix crash menú hamburguesa | ✅ DONE |
+| T062 | Expandir tests v2 | ✅ DONE |
+| T063 | Build OpenVPN desde la GUI | ✅ DONE |
 
-## Prioridad Alta — Migración de config (bloquea otras tareas)
-
-La migración a YAML es prerequisito para la pantalla de configuración y simplifica
-la extensibilidad futura. Conviene hacerla primero.
-
-| ID | Tarea | Estado | Justificación |
-|----|-------|--------|---------------|
-| T041 | Migrar config a YAML | ✅ DONE | Prerequisito para T042, T043 |
-| T042 | Pantalla de configuración (Settings) | ✅ DONE | Requiere T041 |
-| T043 | Migrar CLI a Python | ✅ DONE | Requiere T041 |
-
-## Prioridad Alta — UX inmediata
-
-| ID | Tarea | Estado | Justificación |
-|----|-------|--------|---------------|
-| T044 | Columna KeePass entry en el tree | ✅ DONE | — |
-| T045 | Atajos de teclado Add/Edit/Remove | ✅ DONE | — |
-| T046 | Colores de estado en el log | ✅ DONE | — |
-| T047 | Notificación con IP al conectar | ✅ DONE | — |
-
-## Prioridad Media — Robustez
-
-| ID | Tarea | Estado | Justificación |
-|----|-------|--------|---------------|
-| T048 | Retry con backoff en auto-reconnect | ✅ DONE | — |
-| T049 | Validar .ovpn antes de conectar | ✅ DONE | — |
-| T050 | Backup de config.yaml antes de guardar | ✅ DONE | — |
-
-## Prioridad Media — Funcionalidad
+## Pendientes — Cross-platform (ambos SO)
 
 | ID | Tarea | Estado | Justificación |
 |----|-------|--------|---------------|
-| T051 | Última conexión exitosa por perfil | ✅ DONE | — |
-| T052 | Abrir carpeta de configs en Dolphin | ✅ DONE | — |
-| T053 | Abrir carpeta de logs en Dolphin | ✅ DONE | — |
-| T054 | Doble-click en log copia la línea | ✅ DONE | — |
-| T055 | Contador de perfiles en status bar | ✅ DONE | — |
+| L016 | Packaging RPM/Flatpak | ⚪ BACKLOG | Distribución más fácil en Linux |
 
-## Prioridad Media-Baja — CLI
+## Pendientes — Windows Port
+
+### Fase 1: Refactor cross-platform (preparación, sin romper Linux)
 
 | ID | Tarea | Estado | Justificación |
 |----|-------|--------|---------------|
-| T056 | CLI --remove | ✅ DONE | — |
-| T057 | CLI --edit | ✅ DONE | — |
-| T058 | CLI --version | ✅ DONE | Implementado en T043 |
+| T064 | Módulo platform.py — abstracción de rutas | ⚪ BACKLOG | Centralizar rutas XDG (Linux) vs %APPDATA% (Windows) |
+| T065 | Abstracción de escalación de privilegios | ⚪ BACKLOG | pkexec (Linux) vs runas/UAC (Windows) |
+| T066 | Abstracción de detección de binarios OpenVPN | ⚪ BACKLOG | /opt/ (Linux) vs Program Files (Windows) |
+| T067 | Reemplazar curl/dig por Python stdlib | ⚪ BACKLOG | IP check y DNS check sin dependencias externas |
+| T068 | Abstracción de autostart | ⚪ BACKLOG | .desktop (Linux) vs Registry/Startup folder (Windows) |
+| T069 | Tests cross-platform | ⚪ BACKLOG | Asegurar que los tests no dependen de paths Linux |
 
-## Prioridad Baja — Visual e infra
+### Fase 2: Soporte Windows
 
 | ID | Tarea | Estado | Justificación |
 |----|-------|--------|---------------|
-| T059 | Ícono custom de la app | ✅ DONE | SVG escudo con candado |
-| T060 | Splash screen mínimo | ✅ DONE | QSplashScreen con ícono custom |
-| T061 | Fix crash menú hamburguesa | ✅ DONE | Defer _rebuild_tray_menu con QTimer.singleShot |
-| T016 | Packaging RPM/Flatpak | ⚪ BACKLOG | Distribución más fácil |
+| W001 | Rutas Windows (%APPDATA%, Program Files) | ⚪ BACKLOG | Config y binarios en ubicaciones Windows |
+| W002 | Escalación de privilegios con UAC | ⚪ BACKLOG | Ejecutar OpenVPN como admin en Windows |
+| W003 | Detección de instalaciones OpenVPN en Windows | ⚪ BACKLOG | Buscar en Program Files, registry, PATH |
+| W004 | Descarga de binarios pre-compilados para Windows | ⚪ BACKLOG | En Windows no compilamos, descargamos instaladores oficiales |
+| W005 | Autostart en Windows (Registry o Startup folder) | ⚪ BACKLOG | Arrancar al login en Windows |
+| W006 | Iconos bundled (sin freedesktop theme) | ⚪ BACKLOG | Windows no tiene tema de iconos freedesktop |
+| W007 | KeePassXC CLI en Windows | ⚪ BACKLOG | Detectar keepassxc-cli.exe en Program Files |
+| W008 | CI para Windows (GitHub Actions) | ⚪ BACKLOG | Testear en Windows automáticamente |
+| W009 | Instalador Windows (PyInstaller o NSIS) | ⚪ BACKLOG | Distribuir como .exe o .msi |
+| W010 | Documentación Windows | ⚪ BACKLOG | Guía de instalación y uso en Windows |
 
 ## Desestimados
 
@@ -108,13 +110,16 @@ la extensibilidad futura. Conviene hacerla primero.
 
 Estados: ⚪ BACKLOG → 📋 PROPOSAL → 🔵 ACTIVE → ✅ DONE
 
-## Notas de priorización
+## Convención de IDs
 
-- **T041-T043** van primero porque la migración a YAML desbloquea settings y CLI en Python
-- **T044-T047** son mejoras de UX rápidas que se pueden hacer en paralelo o antes de T041
-- **T048-T050** mejoran robustez sin cambios grandes
-- **T051-T055** funcionalidad nice-to-have
-- **T056-T058** CLI depende de T043 (migración CLI a Python)
-- **T059-T060** look propio de la app
-- **T014, T016** siguen siendo complejos
-- **T011** desestimado — no se necesita más de una VPN activa
+- **Txxx** — Tareas cross-platform (ambos SO)
+- **Lxxx** — Tareas Linux-only
+- **Wxxx** — Tareas Windows-only
+
+## Notas de priorización — Windows Port
+
+- **Fase 1 (T064-T069)**: refactor del código actual para abstraer diferencias de plataforma. Se hace primero sin romper Linux. Cada tarea es independiente.
+- **Fase 2 (W001-W010)**: implementación específica de Windows. Depende de Fase 1.
+- **W004** es la diferencia más grande: en Windows no compilamos OpenVPN, descargamos binarios oficiales de https://openvpn.net/community-downloads/
+- **W002** (UAC) es lo más complejo técnicamente
+- **W009** (instalador) es lo último — primero que funcione, después empaquetar

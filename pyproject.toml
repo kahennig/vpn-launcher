@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "ovpn-launcher"
-version = "0.1.0"
+version = "0.2.0"
 description = "Multi-version OpenVPN connection manager with GUI and CLI"
 readme = "README.md"
 license = "GPL-3.0-or-later"

@@ -199,4 +199,56 @@ class TestDetectVersions:
     def test_system_included_if_exists(self):
         versions = detect_versions()
         if Path("/usr/bin/openvpn").is_file():
-            assert "system" in versions
+            assert any(v.startswith("system") for v in versions)
+
+
+class TestSaveProfilesLastConnected:
+    def test_save_and_load_last_connected(self, conf_file):
+        profiles = [
+            {"alias": "a", "version": "system", "config": "/a.ovpn",
+             "auth_mode": "none", "keepass_entry": "", "last_connected": "2026-04-10 15:30"},
+        ]
+        save_profiles(profiles, conf_file)
+        loaded = load_profiles(conf_file)
+        assert loaded[0]["last_connected"] == "2026-04-10 15:30"
+
+    def test_empty_last_connected_omitted(self, conf_file):
+        profiles = [
+            {"alias": "a", "version": "system", "config": "/a.ovpn",
+             "auth_mode": "none", "keepass_entry": "", "last_connected": ""},
+        ]
+        save_profiles(profiles, conf_file)
+        content = conf_file.read_text()
+        assert "last_connected" not in content
+
+
+class TestSaveBackup:
+    def test_creates_backup(self, conf_file):
+        conf_file.write_text("profiles: []\n")
+        profiles = [{"alias": "a", "version": "system", "config": "/a.ovpn",
+                      "auth_mode": "none", "keepass_entry": "", "last_connected": ""}]
+        save_profiles(profiles, conf_file)
+        bak = conf_file.with_suffix(".yaml.bak")
+        assert bak.exists()
+        assert "profiles: []" in bak.read_text()
+
+
+class TestAutoMigration:
+    def test_auto_migrates_on_load(self, tmp_path):
+        legacy = tmp_path / "connections.conf"
+        legacy.write_text("vpn|system|/vpn.ovpn|keepass\n")
+        yaml_path = tmp_path / "config.yaml"
+        # Monkey-patch the module constants temporarily
+        import ovpn_launcher.profiles as mod
+        orig_yaml = mod.CONFIG_YAML
+        orig_conf = mod.CONNECTIONS_CONF
+        mod.CONFIG_YAML = yaml_path
+        mod.CONNECTIONS_CONF = legacy
+        try:
+            profiles = load_profiles(yaml_path)
+            assert len(profiles) == 1
+            assert profiles[0]["alias"] == "vpn"
+            assert yaml_path.exists()
+        finally:
+            mod.CONFIG_YAML = orig_yaml
+            mod.CONNECTIONS_CONF = orig_conf

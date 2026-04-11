@@ -19,7 +19,7 @@ from PyQt6.QtWidgets import (
     QMenu, QInputDialog, QLineEdit, QMessageBox, QTextEdit, QSplitter,
     QToolBar, QStatusBar, QHeaderView, QStyle, QDialog, QTabWidget,
     QFormLayout, QComboBox, QFileDialog, QDialogButtonBox, QToolButton,
-    QSpinBox, QSplashScreen,
+    QSpinBox, QSplashScreen, QTextBrowser,
 )
 
 from .paths import CONNECTIONS_CONF, openvpn_binary
@@ -27,7 +27,85 @@ from .paths import CONFIG_DIR, LOG_DIR, AUTOSTART_DIR, AUTOSTART_DESKTOP, OPENVP
 from .profiles import load_profiles, save_profiles, detect_versions, load_settings, save_settings, VALID_AUTH_MODES
 from . import __version__
 
+from .builder import fetch_available_versions, installed_versions, build_openvpn
+
 log = logging.getLogger(__name__)
+
+
+class BuildDialog(QDialog):
+    def __init__(self, parent=None, prefix="/opt"):
+        super().__init__(parent)
+        self.prefix = prefix
+        self.setWindowTitle("Build OpenVPN")
+        self.setMinimumSize(500, 400)
+        layout = QVBoxLayout(self)
+
+        row = QHBoxLayout()
+        row.addWidget(QLabel("Version:"))
+        self.version_combo = QComboBox()
+        self.version_combo.setEditable(True)
+        self.version_combo.addItem("Loading versions...")
+        row.addWidget(self.version_combo)
+        self.build_btn = QPushButton("Build")
+        self.build_btn.clicked.connect(self._start_build)
+        row.addWidget(self.build_btn)
+        layout.addLayout(row)
+
+        self.output = QTextEdit()
+        self.output.setReadOnly(True)
+        self.output.setStyleSheet("font-family: monospace; font-size: 9pt;")
+        layout.addWidget(self.output)
+
+        self.close_btn = QPushButton("Close")
+        self.close_btn.clicked.connect(self.accept)
+        btn_layout = QHBoxLayout()
+        btn_layout.addStretch()
+        btn_layout.addWidget(self.close_btn)
+        layout.addLayout(btn_layout)
+
+        self._building = False
+        QTimer.singleShot(0, self._load_versions)
+
+    def _load_versions(self):
+        self.version_combo.clear()
+        inst = set(installed_versions(self.prefix))
+        available = fetch_available_versions()
+        for v in available:
+            label = f"{v} (installed)" if v in inst else v
+            self.version_combo.addItem(label, v)
+        if not available:
+            self.version_combo.addItem("(type version manually)")
+
+    def _start_build(self):
+        if self._building:
+            return
+        version = self.version_combo.currentData() or self.version_combo.currentText().strip()
+        if not version or version.startswith("("):
+            return
+        self._building = True
+        self.build_btn.setEnabled(False)
+        self.close_btn.setEnabled(False)
+        self.output.clear()
+
+        import threading
+        def run():
+            build_openvpn(version, self.prefix, on_output=self._append_output)
+            self._build_done()
+        threading.Thread(target=run, daemon=True).start()
+
+    def _append_output(self, text):
+        from PyQt6.QtCore import QMetaObject, Qt as QtConst, Q_ARG
+        QMetaObject.invokeMethod(self.output, "append", QtConst.ConnectionType.QueuedConnection, Q_ARG(str, text))
+
+    def _build_done(self):
+        self._append_output("\n--- Build process finished ---")
+        self._building = False
+        QTimer.singleShot(0, self._enable_buttons)
+
+    def _enable_buttons(self):
+        self.build_btn.setEnabled(True)
+        self.close_btn.setEnabled(True)
+        self._load_versions()
 
 
 class SettingsDialog(QDialog):
@@ -115,7 +193,10 @@ class ProfileDialog(QDialog):
         self.version_combo = QComboBox()
         self.version_combo.setEditable(True)
         for v in detect_versions():
-            self.version_combo.addItem(v)
+            if v.startswith("system"):
+                self.version_combo.addItem(v, "system")
+            else:
+                self.version_combo.addItem(v, v)
         layout.addRow("OpenVPN Version:", self.version_combo)
 
         config_row = QHBoxLayout()
@@ -143,7 +224,11 @@ class ProfileDialog(QDialog):
 
         if profile:
             self.alias_edit.setText(profile["alias"])
-            self.version_combo.setCurrentText(profile["version"])
+            idx = self.version_combo.findData(profile["version"])
+            if idx >= 0:
+                self.version_combo.setCurrentIndex(idx)
+            else:
+                self.version_combo.setCurrentText(profile["version"])
             self.config_edit.setText(profile["config"])
             self.auth_combo.setCurrentText(profile.get("auth_mode", "none"))
             self.keepass_entry_edit.setText(profile.get("keepass_entry", ""))
@@ -182,7 +267,7 @@ class ProfileDialog(QDialog):
     def get_profile(self):
         return {
             "alias": self.alias_edit.text().strip(),
-            "version": self.version_combo.currentText().strip(),
+            "version": self.version_combo.currentData() or self.version_combo.currentText().strip(),
             "config": self.config_edit.text().strip(),
             "auth_mode": self.auth_combo.currentText(),
             "keepass_entry": self.keepass_entry_edit.text().strip(),
@@ -264,29 +349,29 @@ class VPNLauncher(QMainWindow):
         self.action_add = QAction(QIcon.fromTheme("list-add"), "&Add Profile", self)
         self.action_add.setShortcut(QKeySequence("Ctrl+N"))
         self.action_add.setToolTip("Add a new VPN profile (Ctrl+N)")
-        self.action_add.triggered.connect(lambda: QTimer.singleShot(0, self.on_add_profile))
+        self.action_add.triggered.connect(self.on_add_profile)
 
         self.action_import = QAction(QIcon.fromTheme("document-import"), "&Import .ovpn", self)
         self.action_import.setToolTip("Import an .ovpn file as a new profile")
-        self.action_import.triggered.connect(lambda: QTimer.singleShot(0, self.on_import_ovpn))
+        self.action_import.triggered.connect(self.on_import_ovpn)
 
         self.action_import_zip = QAction(QIcon.fromTheme("package-x-generic"), "I&mport Profile", self)
         self.action_import_zip.setToolTip("Import a profile from exported .zip")
-        self.action_import_zip.triggered.connect(lambda: QTimer.singleShot(0, self.on_import_zip))
+        self.action_import_zip.triggered.connect(self.on_import_zip)
 
         self.action_edit = QAction(QIcon.fromTheme("document-edit"), "&Edit Profile", self)
         self.action_edit.setShortcut(QKeySequence("Ctrl+E"))
         self.action_edit.setToolTip("Edit selected profile (Ctrl+E)")
-        self.action_edit.triggered.connect(lambda: QTimer.singleShot(0, self.on_edit_profile))
+        self.action_edit.triggered.connect(self.on_edit_profile)
 
         self.action_remove = QAction(QIcon.fromTheme("list-remove"), "&Remove Profile", self)
         self.action_remove.setShortcut(QKeySequence("Delete"))
         self.action_remove.setToolTip("Remove selected profile (Delete)")
-        self.action_remove.triggered.connect(lambda: QTimer.singleShot(0, self.on_remove_profile))
+        self.action_remove.triggered.connect(self.on_remove_profile)
 
         self.action_export = QAction(QIcon.fromTheme("document-export"), "E&xport Profile", self)
         self.action_export.setToolTip("Export selected profile as .zip")
-        self.action_export.triggered.connect(lambda: QTimer.singleShot(0, self.on_export_profile))
+        self.action_export.triggered.connect(self.on_export_profile)
 
         self.action_ping = QAction(QIcon.fromTheme("network-wired"), "&Ping Server", self)
         self.action_ping.setToolTip("Ping VPN server to check latency")
@@ -296,6 +381,10 @@ class VPNLauncher(QMainWindow):
         self.action_dns_check.setToolTip("Check DNS resolver (leak test)")
         self.action_dns_check.triggered.connect(self.on_dns_check)
 
+        self.action_build = QAction(QIcon.fromTheme("run-build"), "Build Open&VPN", self)
+        self.action_build.setToolTip("Download and compile an OpenVPN version")
+        self.action_build.triggered.connect(self._show_build_dialog)
+
         self.action_open_configs = QAction(QIcon.fromTheme("folder-open"), "Open Configs Folder", self)
         self.action_open_configs.triggered.connect(lambda: self._open_folder(CONFIG_DIR / "configs"))
 
@@ -303,10 +392,10 @@ class VPNLauncher(QMainWindow):
         self.action_open_logs.triggered.connect(lambda: self._open_folder(LOG_DIR))
 
         self.action_about = QAction(QIcon.fromTheme("help-about"), "&About VPN Launcher", self)
-        self.action_about.triggered.connect(lambda: QTimer.singleShot(0, self._show_about))
+        self.action_about.triggered.connect(self._show_about)
 
         self.action_settings = QAction(QIcon.fromTheme("configure"), "&Settings", self)
-        self.action_settings.triggered.connect(lambda: QTimer.singleShot(0, self._show_settings))
+        self.action_settings.triggered.connect(self._show_settings)
 
         self.action_search_log = QAction("Find in Log", self)
         self.action_search_log.setShortcut(QKeySequence.StandardKey.Find)
@@ -319,7 +408,12 @@ class VPNLauncher(QMainWindow):
 
     # ── About ─────────────────────────────────────────────────────────
 
-    def _show_about(self):
+    def _show_about(self, _checked=False):
+        if not hasattr(self, '_about_dlg'):
+            self._about_dlg = self._create_about_dialog()
+        self._about_dlg.exec()
+
+    def _create_about_dialog(self):
         dlg = QDialog(self)
         dlg.setWindowTitle("About VPN Launcher")
         dlg.setFixedSize(460, 420)
@@ -375,8 +469,7 @@ class VPNLauncher(QMainWindow):
         )
         tabs.addTab(about_tab, "About")
 
-        author_tab = QTextEdit()
-        author_tab.setReadOnly(True)
+        author_tab = QTextBrowser()
         author_tab.setStyleSheet("font-size: 10pt;")
         author_tab.setHtml(
             "<p><b>Andreas Hennig</b><br>Author &amp; Maintainer</p>"
@@ -417,7 +510,7 @@ class VPNLauncher(QMainWindow):
         btn_layout.addWidget(close_btn)
         layout.addLayout(btn_layout)
 
-        dlg.exec()
+        return dlg
 
     def _show_settings(self):
         dlg = SettingsDialog(self, self._app_settings)
@@ -425,6 +518,12 @@ class VPNLauncher(QMainWindow):
             self._app_settings = dlg.get_settings()
             save_settings(self._app_settings)
             self.reload_profiles()
+
+    def _show_build_dialog(self, _checked=False):
+        prefix = self._app_settings.get("openvpn_prefix", "/opt")
+        dlg = BuildDialog(self, prefix=prefix)
+        dlg.exec()
+        self.reload_profiles()
 
     # ── Toolbar ──────────────────────────────────────────────────────
 
@@ -444,6 +543,8 @@ class VPNLauncher(QMainWindow):
         toolbar.addAction(self.action_import)
         toolbar.addAction(self.action_import_zip)
         toolbar.addAction(self.action_export)
+        toolbar.addSeparator()
+        toolbar.addAction(self.action_build)
         toolbar.addSeparator()
         toolbar.addAction(self.action_reload)
         toolbar.addAction(self.action_clear_log)
@@ -466,6 +567,7 @@ class VPNLauncher(QMainWindow):
         hamburger_menu.addSeparator()
         hamburger_menu.addAction(self.action_ping)
         hamburger_menu.addAction(self.action_dns_check)
+        hamburger_menu.addAction(self.action_build)
         hamburger_menu.addAction(self.action_open_configs)
         hamburger_menu.addAction(self.action_open_logs)
         hamburger_menu.addSeparator()
@@ -540,8 +642,10 @@ class VPNLauncher(QMainWindow):
         self._search_bar.hide()
         splitter.addWidget(self._search_bar)
 
-        splitter.setStretchFactor(0, 1)
-        splitter.setStretchFactor(1, 2)
+        splitter.setStretchFactor(0, 0)
+        splitter.setStretchFactor(1, 1)
+        splitter.setStretchFactor(2, 2)
+        splitter.setStretchFactor(3, 0)
 
         if self.settings.contains("splitter_state"):
             splitter.restoreState(self.settings.value("splitter_state"))
@@ -919,6 +1023,7 @@ class VPNLauncher(QMainWindow):
                 item.setToolTip(0, "\n".join(warnings))
             else:
                 item.setIcon(0, _app_icon())
+            self.profile_tree.addTopLevelItem(item)
         if self.profiles:
             self.profile_tree.setCurrentItem(self.profile_tree.topLevelItem(0))
         self._rebuild_tray_menu()
@@ -1098,9 +1203,12 @@ class VPNLauncher(QMainWindow):
         if "Initialization Sequence Completed" in data:
             self.connect_timer.stop()
             ts = datetime.now().strftime("%Y-%m-%d %H:%M")
-            for p in self.profiles:
+            for i, p in enumerate(self.profiles):
                 if p["alias"] == self.connected_alias:
                     p["last_connected"] = ts
+                    item = self.profile_tree.topLevelItem(i)
+                    if item:
+                        item.setText(5, ts)
                     break
             save_profiles(self.profiles)
             self._update_state(self.STATE_CONNECTED)
@@ -1293,6 +1401,10 @@ def _app_icon():
 
 
 def main():
+    def _excepthook(exc_type, exc_value, exc_tb):
+        log.error("Unhandled exception", exc_info=(exc_type, exc_value, exc_tb))
+    sys.excepthook = _excepthook
+
     logging.basicConfig(
         level=getattr(logging, os.environ.get("OVPN_LOG_LEVEL", "").upper() or load_settings().get("log_level", "WARNING"), logging.WARNING),
         format="%(asctime)s %(levelname)s %(message)s",

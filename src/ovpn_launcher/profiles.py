@@ -1,6 +1,7 @@
 """Profile loading, saving, version detection, and settings (YAML config)."""
 
 from pathlib import Path
+import subprocess
 
 import yaml
 
@@ -113,9 +114,15 @@ def migrate_legacy_config(legacy_path=None, yaml_path=None):
 def detect_versions(prefix=None):
     p = Path(prefix) if prefix else OPENVPN_PREFIX
     versions = []
+    if Path("/usr/bin/openvpn").is_file():
+        try:
+            ver = subprocess.run(
+                ["/usr/bin/openvpn", "--version"], capture_output=True, text=True
+            ).stdout.split()[1]
+        except Exception:
+            ver = "?"
+        versions.append(f"system ({ver})")
     for d in sorted(p.glob("openvpn-*/sbin/openvpn")):
         if d.is_file():
             versions.append(d.parent.parent.name.removeprefix("openvpn-"))
-    if Path("/usr/bin/openvpn").is_file():
-        versions.append("system")
     return versions
