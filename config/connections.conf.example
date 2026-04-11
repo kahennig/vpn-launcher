@@ -1,0 +1,20 @@
+# VPN connection profiles
+# Format: alias|version|config_file|auth_mode|keepass_entry
+#
+# version can be:
+#   "system"  - use /usr/bin/openvpn
+#   "2.6.14"  - use /opt/openvpn-2.6.14/sbin/openvpn
+#
+# auth_mode (optional, defaults to "none"):
+#   "none"    - connect without credentials
+#   "keepass" - fetch credentials from KeePass database
+#   "prompt"  - ask for username and password interactively
+#
+# keepass_entry (optional): KeePass entry title to look up.
+#   If empty, the alias is used as the entry title.
+#
+# Examples:
+# client-a|2.5.11|/home/user/.config/ovpn-launcher/configs/client-a.ovpn|keepass
+# client-b|2.6.14|/home/user/.config/ovpn-launcher/configs/client-b.ovpn|keepass|VPN Client B
+# client-c|2.6.14|/home/user/.config/ovpn-launcher/configs/client-c.ovpn|prompt
+# office|system|/home/user/.config/ovpn-launcher/configs/office.ovpn

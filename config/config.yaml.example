@@ -1,0 +1,54 @@
+# ovpn-launcher configuration
+# Location: ~/.config/ovpn-launcher/config.yaml
+
+settings:
+  # Path prefix for compiled OpenVPN binaries (default: /opt)
+  openvpn_prefix: /opt
+
+  # KeePass database path (default: ~/Document/Keepass/keepass.kdbx)
+  keepass_db: ~/Document/Keepass/keepass.kdbx
+
+  # Connection timeout in seconds (default: 30)
+  connection_timeout: 30
+
+  # Auto-reconnect delay in seconds (default: 5)
+  reconnect_delay: 5
+
+  # Public IP lookup service URL (default: https://api.ipify.org)
+  ip_service: https://api.ipify.org
+
+  # Log level: DEBUG, INFO, WARNING, ERROR (default: WARNING)
+  # Can be overridden with OVPN_LOG_LEVEL env var
+  log_level: WARNING
+
+profiles:
+  # version: "system" uses /usr/bin/openvpn
+  # version: "2.6.14" uses /opt/openvpn-2.6.14/sbin/openvpn
+  #
+  # auth_mode (optional, defaults to none):
+  #   none    - connect without credentials
+  #   keepass - fetch credentials from KeePass database
+  #   prompt  - ask for username and password interactively
+  #
+  # keepass_entry (optional): KeePass entry title to look up.
+  #   If omitted, the alias is used as the entry title.
+
+  - alias: client-a
+    version: "2.5.11"
+    config: /home/user/.config/ovpn-launcher/configs/client-a.ovpn
+    auth_mode: keepass
+
+  - alias: client-b
+    version: "2.6.14"
+    config: /home/user/.config/ovpn-launcher/configs/client-b.ovpn
+    auth_mode: keepass
+    keepass_entry: VPN Client B
+
+  - alias: client-c
+    version: "2.6.14"
+    config: /home/user/.config/ovpn-launcher/configs/client-c.ovpn
+    auth_mode: prompt
+
+  - alias: office
+    version: system
+    config: /home/user/.config/ovpn-launcher/configs/office.ovpn

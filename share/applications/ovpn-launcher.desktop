@@ -1,0 +1,10 @@
+[Desktop Entry]
+Type=Application
+Name=VPN Launcher
+Comment=Multi-version OpenVPN connection manager
+Exec=ovpn-app
+Icon=ovpn-launcher
+Terminal=false
+Categories=Network;System;
+Keywords=vpn;openvpn;network;
+StartupNotify=true

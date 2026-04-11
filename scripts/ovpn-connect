@@ -1,0 +1,170 @@
+#!/bin/bash
+# ovpn-connect: CLI to connect using a specific OpenVPN version
+# Usage:
+#   ovpn-connect <alias>                  (uses version from connections.conf)
+#   ovpn-connect <version> <config.ovpn>  (direct mode)
+#   ovpn-connect --list                   (list profiles and installed versions)
+#   ovpn-connect --add                    (add a new profile interactively)
+#   ovpn-connect --status                 (check if openvpn is running)
+
+set -euo pipefail
+
+XDG_CONFIG_HOME="${XDG_CONFIG_HOME:-$HOME/.config}"
+CONFDIR="${XDG_CONFIG_HOME}/ovpn-launcher"
+CONF="${OVPN_CONF:-$CONFDIR/connections.conf}"
+KPDB="${OVPN_KEEPASS_DB:-$HOME/Document/Keepass/keepass.kdbx}"
+
+list_versions() {
+    echo "Installed versions:"
+    for b in /opt/openvpn-*/sbin/openvpn; do
+        [ -x "$b" ] && echo "  $(echo "$b" | sed 's|/opt/openvpn-\(.*\)/sbin/openvpn|\1|')"
+    done
+    [ -x /usr/bin/openvpn ] && echo "  system ($(openvpn --version 2>/dev/null | head -1 | awk '{print $2}'))"
+    echo
+    echo "Configured profiles ($CONF):"
+    grep -v '^#' "$CONF" 2>/dev/null | grep '|' | while IFS='|' read -r alias ver cfg; do
+        echo "  $alias -> version $ver ($cfg)"
+    done
+}
+
+resolve_binary() {
+    local ver="$1"
+    if [ "$ver" = "system" ]; then
+        echo "/usr/bin/openvpn"
+    else
+        echo "/opt/openvpn-${ver}/sbin/openvpn"
+    fi
+}
+
+add_profile() {
+    read -p "Alias: " alias
+    [ -z "$alias" ] && { echo "Alias cannot be empty" >&2; exit 1; }
+    if grep -q "^${alias}|" "$CONF" 2>/dev/null; then
+        echo "Alias '$alias' already exists" >&2; exit 1
+    fi
+    echo "Available versions:"
+    for b in /opt/openvpn-*/sbin/openvpn; do
+        [ -x "$b" ] && echo "  $(echo "$b" | sed 's|/opt/openvpn-\(.*\)/sbin/openvpn|\1|')"
+    done
+    [ -x /usr/bin/openvpn ] && echo "  system"
+    read -p "Version: " version
+    read -p "Config file path: " config
+    echo "Auth mode (none/keepass/prompt) [none]: "
+    read auth_mode
+    auth_mode="${auth_mode:-none}"
+    mkdir -p "$CONFDIR"
+    if [ "$auth_mode" = "none" ]; then
+        echo "${alias}|${version}|${config}" >> "$CONF"
+    else
+        echo "${alias}|${version}|${config}|${auth_mode}" >> "$CONF"
+    fi
+    echo "Profile '$alias' added."
+}
+
+show_status() {
+    if pgrep -x openvpn > /dev/null 2>&1; then
+        echo "OpenVPN is running (PID: $(pgrep -x openvpn | tr '\n' ' '))"
+    else
+        echo "No OpenVPN process running."
+    fi
+}
+
+if [ "${1:-}" = "--list" ] || [ "${1:-}" = "-l" ]; then
+    list_versions
+    exit 0
+fi
+
+if [ "${1:-}" = "--add" ]; then
+    add_profile
+    exit 0
+fi
+
+if [ "${1:-}" = "--status" ] || [ "${1:-}" = "-s" ]; then
+    show_status
+    exit 0
+fi
+
+if [ $# -eq 1 ]; then
+    match=$(grep -v '^#' "$CONF" 2>/dev/null | grep "^${1}|" || true)
+    if [ -z "$match" ]; then
+        echo "Profile '$1' not found in $CONF" >&2
+        echo "Run: ovpn-connect --list" >&2
+        exit 1
+    fi
+    VERSION=$(echo "$match" | cut -d'|' -f2)
+    CONFIG=$(echo "$match" | cut -d'|' -f3)
+    AUTH_MODE=$(echo "$match" | cut -d'|' -f4)
+    AUTH_MODE="${AUTH_MODE:-none}"
+    KEEPASS_ENTRY=$(echo "$match" | cut -d'|' -f5)
+    KEEPASS_ENTRY="${KEEPASS_ENTRY:-}"
+elif [ $# -eq 2 ]; then
+    VERSION="$1"
+    CONFIG="$2"
+    AUTH_MODE="none"
+    KEEPASS_ENTRY=""
+else
+    echo "Usage: ovpn-connect <alias>"
+    echo "       ovpn-connect <version> <config.ovpn>"
+    echo "       ovpn-connect --list"
+    echo "       ovpn-connect --add"
+    echo "       ovpn-connect --status"
+    exit 1
+fi
+
+BINARY=$(resolve_binary "$VERSION")
+
+if [ ! -x "$BINARY" ]; then
+    echo "OpenVPN $VERSION not found at $BINARY" >&2
+    echo "Run: ovpn-connect --list" >&2
+    exit 1
+fi
+
+if [ ! -f "$CONFIG" ]; then
+    echo "Config not found: $CONFIG" >&2
+    exit 1
+fi
+
+echo "Connecting with OpenVPN $VERSION ($BINARY)"
+echo "Config: $CONFIG"
+
+# Get credentials based on auth_mode
+AUTHFILE=""
+ALIAS="${1:-}"
+KP_LOOKUP="${KEEPASS_ENTRY:-$ALIAS}"
+if [ "$AUTH_MODE" = "keepass" ] && [ -f "$KPDB" ]; then
+    echo "Looking up credentials for '$KP_LOOKUP' in KeePass..."
+    if [ -n "${KPPASS:-}" ]; then
+        KPMASTER="$KPPASS"
+    else
+        read -s -p "KeePass master password: " KPMASTER
+        echo
+    fi
+    VPNUSER=$(echo "$KPMASTER" | keepassxc-cli show -q -s -a Username "$KPDB" "$KP_LOOKUP" 2>/dev/null) || true
+    VPNPWD=$(echo "$KPMASTER" | keepassxc-cli show -q -s -a Password "$KPDB" "$KP_LOOKUP" 2>/dev/null) || true
+    unset KPMASTER
+    if [ -n "$VPNUSER" ] && [ -n "$VPNPWD" ]; then
+        AUTHFILE=$(mktemp /tmp/ovpn-auth.XXXXXX)
+        chmod 600 "$AUTHFILE"
+        printf '%s\n%s\n' "$VPNUSER" "$VPNPWD" > "$AUTHFILE"
+        trap 'rm -f "$AUTHFILE"' EXIT
+        echo "Credentials loaded from KeePass."
+    else
+        echo "No KeePass entry found for '$ALIAS', connecting without stored credentials."
+    fi
+elif [ "$AUTH_MODE" = "prompt" ]; then
+    read -p "VPN username for '$ALIAS': " VPNUSER
+    read -sp "VPN password for '$ALIAS': " VPNPWD
+    echo
+    if [ -n "$VPNUSER" ] && [ -n "$VPNPWD" ]; then
+        AUTHFILE=$(mktemp /tmp/ovpn-auth.XXXXXX)
+        chmod 600 "$AUTHFILE"
+        printf '%s\n%s\n' "$VPNUSER" "$VPNPWD" > "$AUTHFILE"
+        trap 'rm -f "$AUTHFILE"' EXIT
+    fi
+fi
+
+if [ -n "$AUTHFILE" ]; then
+    sudo "$BINARY" --config "$CONFIG" --auth-user-pass "$AUTHFILE"
+else
+    sudo "$BINARY" --config "$CONFIG"
+fi
