@@ -1126,9 +1126,8 @@ class VPNLauncher(QMainWindow):
             user, pwd = self._get_prompt_creds(alias)
 
         if auth_mode in ("keepass", "prompt") and not user:
-            if auth_mode == "prompt":
-                return
-            self._log_append("-- No credentials obtained, connecting without auth --")
+            self._log_append("-- No credentials obtained, connection aborted --")
+            return
 
         if user and pwd:
             self.auth_file = tempfile.NamedTemporaryFile(mode="w", prefix="ovpn-auth-", delete=False)
