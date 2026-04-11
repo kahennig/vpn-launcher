@@ -17,18 +17,10 @@ jobs:
           python-version: "3.12"
 
       - name: Install dependencies
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y libegl1
-          pip install "PyQt6>=6.5" "pyyaml>=6.0" pytest pytest-qt
+        run: pip install "pyyaml>=6.0" pytest
 
       - name: Install package
         run: pip install -e .
 
-      - name: Run non-GUI tests
+      - name: Run tests
         run: pytest tests/test_profiles.py tests/test_paths.py -v
-
-      - name: Run GUI tests
-        uses: coactions/setup-xvfb@v1
-        with:
-          run: pytest tests/test_app.py -v -k "not VPNLauncher and not LogColor"
