@@ -1,6 +1,8 @@
 """Pure business logic for VPN Launcher (no Qt dependency)."""
 
 import logging
+import os
+import shutil
 import socket
 import subprocess
 import zipfile
@@ -78,6 +80,20 @@ def import_profile_zip(src):
     return meta, ovpn_bytes
 
 
+def keepassxc_cli_path():
+    """Find keepassxc-cli binary. Returns path string or None."""
+    found = shutil.which("keepassxc-cli")
+    if found:
+        return found
+    if IS_WINDOWS:
+        for base in [os.environ.get("PROGRAMFILES", "C:\\Program Files"),
+                     os.environ.get("PROGRAMFILES(X86)", "C:\\Program Files (x86)")]:
+            candidate = Path(base) / "KeePassXC" / "keepassxc-cli.exe"
+            if candidate.is_file():
+                return str(candidate)
+    return None
+
+
 def fetch_keepass_creds(entry, db_path, master_password):
     """Fetch username/password from KeePass via keepassxc-cli.
 
@@ -88,13 +104,17 @@ def fetch_keepass_creds(entry, db_path, master_password):
     if not db.exists():
         log.warning("KeePass DB not found: %s", db)
         return None, None
+    cli = keepassxc_cli_path()
+    if not cli:
+        log.warning("keepassxc-cli not found")
+        return None, None
     try:
         r_user = subprocess.run(
-            ["keepassxc-cli", "show", "-q", "-s", "-a", "Username", str(db), entry],
+            [cli, "show", "-q", "-s", "-a", "Username", str(db), entry],
             input=master_password, capture_output=True, text=True, timeout=10,
         )
         r_pwd = subprocess.run(
-            ["keepassxc-cli", "show", "-q", "-s", "-a", "Password", str(db), entry],
+            [cli, "show", "-q", "-s", "-a", "Password", str(db), entry],
             input=master_password, capture_output=True, text=True, timeout=10,
         )
         user = r_user.stdout.strip()

@@ -13,7 +13,7 @@ from pathlib import Path
 from . import __version__
 from .paths import openvpn_binary
 from .profiles import load_profiles, save_profiles, load_settings, detect_versions, VALID_AUTH_MODES
-from .services import elevate_command
+from .services import elevate_command, fetch_keepass_creds
 
 
 def cmd_list(settings):
@@ -123,24 +123,15 @@ def cmd_edit(alias):
 
 def get_credentials(alias, auth_mode, keepass_entry, settings):
     if auth_mode == "keepass":
-        keepass_db = Path(settings.get("keepass_db", "~/Document/Keepass/keepass.kdbx")).expanduser()
-        if not keepass_db.exists():
+        keepass_db = settings.get("keepass_db", "~/Document/Keepass/keepass.kdbx")
+        if not Path(keepass_db).expanduser().exists():
             print(f"KeePass DB not found: {keepass_db}", file=sys.stderr)
             return None, None
         entry = keepass_entry or alias
         print(f"Looking up credentials for '{entry}' in KeePass...")
         master = os.environ.get("KPPASS") or getpass.getpass("KeePass master password: ")
-        try:
-            user = subprocess.run(
-                ["keepassxc-cli", "show", "-q", "-s", "-a", "Username", str(keepass_db), entry],
-                input=master, capture_output=True, text=True, timeout=10,
-            ).stdout.strip()
-            pwd = subprocess.run(
-                ["keepassxc-cli", "show", "-q", "-s", "-a", "Password", str(keepass_db), entry],
-                input=master, capture_output=True, text=True, timeout=10,
-            ).stdout.strip()
-        except subprocess.TimeoutExpired:
-            return None, None
+        user, pwd = fetch_keepass_creds(entry, keepass_db, master)
+        master = None  # noqa: F841
         if user and pwd:
             print("Credentials loaded from KeePass.")
             return user, pwd

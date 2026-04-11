@@ -1,17 +1,19 @@
-"""OpenVPN version fetching and building."""
+"""OpenVPN version fetching and building/installing."""
 
 import json
+import os
 import re
 import subprocess
 import tempfile
 from pathlib import Path
 from urllib.request import urlopen, Request
 
-from .paths import OPENVPN_GLOB
+from .paths import IS_WINDOWS, OPENVPN_GLOB
 
 
 GITHUB_TAGS_URL = "https://api.github.com/repos/OpenVPN/openvpn/tags?per_page=50"
 DOWNLOAD_URL = "https://swupdate.openvpn.net/community/releases/openvpn-{version}.tar.gz"
+MSI_URL = "https://swupdate.openvpn.net/community/releases/OpenVPN-{version}-I001-amd64.msi"
 STABLE_RE = re.compile(r"^v(\d+\.\d+\.\d+)$")
 
 
@@ -38,7 +40,97 @@ def installed_versions(prefix="/opt"):
     return versions
 
 
-def build_openvpn(version, prefix="/opt", on_output=None):
+def has_tap_driver():
+    """Check if a TAP/TUN driver is installed (Windows only)."""
+    if not IS_WINDOWS:
+        return True
+    candidates = [
+        Path(os.environ.get("SYSTEMROOT", "C:\\Windows")) / "System32" / "drivers" / "tap0901.sys",
+        Path(os.environ.get("SYSTEMROOT", "C:\\Windows")) / "System32" / "wintun.dll",
+        Path(os.environ.get("PROGRAMFILES", "C:\\Program Files")) / "TAP-Windows",
+        Path(os.environ.get("PROGRAMFILES", "C:\\Program Files")) / "OpenVPN" / "bin" / "openvpn.exe",
+    ]
+    return any(p.exists() for p in candidates)
+
+
+def _install_openvpn_windows(version, prefix, on_output=None, full_install=False):
+    """Download and install OpenVPN on Windows from official MSI."""
+    def log(msg):
+        if on_output:
+            on_output(msg)
+
+    dest = Path(prefix) / f"openvpn-{version}"
+    binary = dest / "bin" / "openvpn.exe"
+    if binary.is_file():
+        log(f"OpenVPN {version} already installed at {dest}")
+        return True
+
+    url = MSI_URL.format(version=version)
+    build_dir = Path(tempfile.mkdtemp(prefix="openvpn-install-"))
+    msi_path = build_dir / f"OpenVPN-{version}.msi"
+
+    try:
+        log(f"==> Downloading OpenVPN {version} MSI...")
+        req = Request(url, headers={"User-Agent": "ovpn-launcher"})
+        with urlopen(req, timeout=120) as resp, open(msi_path, "wb") as f:
+            f.write(resp.read())
+        if not msi_path.exists() or msi_path.stat().st_size < 10000:
+            log("ERROR: Download failed or file too small")
+            return False
+
+        if full_install:
+            log(f"==> Installing OpenVPN {version} (full, with drivers)...")
+            r = subprocess.run(
+                ["msiexec", "/i", str(msi_path), "/qn",
+                 f"PRODUCTDIR={dest}", "ADDLOCAL=ALL"],
+                capture_output=True, text=True, timeout=120,
+            )
+        else:
+            log(f"==> Extracting OpenVPN {version} binary...")
+            dest.mkdir(parents=True, exist_ok=True)
+            r = subprocess.run(
+                ["msiexec", "/a", str(msi_path), "/qn",
+                 f"TARGETDIR={dest}"],
+                capture_output=True, text=True, timeout=120,
+            )
+
+        if r.returncode != 0:
+            log(f"ERROR: Install failed (code {r.returncode}):\n{r.stderr[-500:] if r.stderr else 'no output'}")
+            return False
+
+        # msiexec /a may nest files; find openvpn.exe
+        found = list(dest.rglob("openvpn.exe"))
+        if found and found[0] != binary:
+            binary.parent.mkdir(parents=True, exist_ok=True)
+            import shutil
+            shutil.move(str(found[0]), str(binary))
+
+        if binary.is_file():
+            log(f"==> Done! OpenVPN {version} installed at {dest}")
+            return True
+        else:
+            log("ERROR: openvpn.exe not found after install")
+            return False
+
+    except subprocess.TimeoutExpired:
+        log("ERROR: Install timed out")
+        return False
+    except Exception as e:
+        log(f"ERROR: {e}")
+        return False
+    finally:
+        import shutil
+        shutil.rmtree(build_dir, ignore_errors=True)
+
+
+def build_openvpn(version, prefix="/opt", on_output=None, full_install=False):
+    """Build (Linux) or install (Windows) an OpenVPN version."""
+    if IS_WINDOWS:
+        return _install_openvpn_windows(version, prefix, on_output, full_install)
+    return _build_openvpn_linux(version, prefix, on_output)
+
+
+def _build_openvpn_linux(version, prefix="/opt", on_output=None):
     def log(msg):
         if on_output:
             on_output(msg)

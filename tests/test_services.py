@@ -14,6 +14,7 @@ from ovpn_launcher.services import (
     export_profile_zip, import_profile_zip, fetch_keepass_creds,
     elevate_command, kill_command, fetch_public_ip, dns_resolver_ip,
     is_autostart_enabled, enable_autostart, disable_autostart,
+    keepassxc_cli_path,
 )
 
 
@@ -176,8 +177,9 @@ class TestFetchKeepassCreds:
         user, pwd = fetch_keepass_creds("entry", tmp_path / "nonexistent.kdbx", "pass")
         assert user is None and pwd is None
 
+    @patch("ovpn_launcher.services.keepassxc_cli_path", return_value="/usr/bin/keepassxc-cli")
     @patch("ovpn_launcher.services.subprocess.run")
-    def test_success(self, mock_run, tmp_path):
+    def test_success(self, mock_run, mock_cli, tmp_path):
         db = tmp_path / "test.kdbx"
         db.write_bytes(b"fake")
         mock_run.side_effect = [
@@ -188,8 +190,9 @@ class TestFetchKeepassCreds:
         assert user == "myuser"
         assert pwd == "mypass"
 
+    @patch("ovpn_launcher.services.keepassxc_cli_path", return_value="/usr/bin/keepassxc-cli")
     @patch("ovpn_launcher.services.subprocess.run")
-    def test_empty_creds(self, mock_run, tmp_path):
+    def test_empty_creds(self, mock_run, mock_cli, tmp_path):
         db = tmp_path / "test.kdbx"
         db.write_bytes(b"fake")
         mock_run.side_effect = [
@@ -199,8 +202,9 @@ class TestFetchKeepassCreds:
         user, pwd = fetch_keepass_creds("entry", str(db), "master")
         assert user is None and pwd is None
 
+    @patch("ovpn_launcher.services.keepassxc_cli_path", return_value="/usr/bin/keepassxc-cli")
     @patch("ovpn_launcher.services.subprocess.run", side_effect=subprocess.TimeoutExpired("cmd", 10))
-    def test_timeout(self, mock_run, tmp_path):
+    def test_timeout(self, mock_run, mock_cli, tmp_path):
         import subprocess
         db = tmp_path / "test.kdbx"
         db.write_bytes(b"fake")
@@ -277,3 +281,29 @@ class TestAutostart:
         autostart_file = tmp_path / "nonexistent"
         with patch("ovpn_launcher.services.AUTOSTART_FILE", autostart_file):
             disable_autostart()  # should not raise
+
+
+class TestKeepassxcCliPath:
+    @patch("ovpn_launcher.services.shutil.which", return_value="/usr/bin/keepassxc-cli")
+    def test_found_in_path(self, mock_which):
+        assert keepassxc_cli_path() == "/usr/bin/keepassxc-cli"
+
+    @patch("ovpn_launcher.services.shutil.which", return_value=None)
+    @patch("ovpn_launcher.services.IS_WINDOWS", False)
+    def test_not_found_linux(self, mock_which):
+        assert keepassxc_cli_path() is None
+
+    @patch("ovpn_launcher.services.shutil.which", return_value=None)
+    @patch("ovpn_launcher.services.IS_WINDOWS", True)
+    def test_found_in_program_files(self, mock_which, tmp_path):
+        cli = tmp_path / "KeePassXC" / "keepassxc-cli.exe"
+        cli.parent.mkdir()
+        cli.write_bytes(b"fake")
+        with patch.dict("os.environ", {"PROGRAMFILES": str(tmp_path)}):
+            assert keepassxc_cli_path() == str(cli)
+
+    @patch("ovpn_launcher.services.shutil.which", return_value=None)
+    @patch("ovpn_launcher.services.IS_WINDOWS", True)
+    def test_not_found_windows(self, mock_which):
+        with patch.dict("os.environ", {"PROGRAMFILES": "/nonexistent", "PROGRAMFILES(X86)": "/nonexistent"}):
+            assert keepassxc_cli_path() is None

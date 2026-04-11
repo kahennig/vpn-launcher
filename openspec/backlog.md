@@ -97,15 +97,15 @@
 
 | ID | Tarea | Estado | Justificación |
 |----|-------|--------|---------------|
-| W001 | Rutas Windows (%APPDATA%, Program Files) | ⚪ BACKLOG | Config y binarios en ubicaciones Windows |
-| W002 | Escalación de privilegios con UAC | ⚪ BACKLOG | Ejecutar OpenVPN como admin en Windows |
-| W003 | Detección de instalaciones OpenVPN en Windows | ⚪ BACKLOG | Buscar en Program Files, registry, PATH |
-| W004 | Descarga de binarios pre-compilados para Windows | ⚪ BACKLOG | En Windows no compilamos, descargamos instaladores oficiales |
-| W005 | Autostart en Windows (Registry o Startup folder) | ⚪ BACKLOG | Arrancar al login en Windows |
-| W006 | Iconos bundled (sin freedesktop theme) | ⚪ BACKLOG | Windows no tiene tema de iconos freedesktop |
-| W007 | KeePassXC CLI en Windows | ⚪ BACKLOG | Detectar keepassxc-cli.exe en Program Files |
-| W008 | CI para Windows (GitHub Actions) | ⚪ BACKLOG | Testear en Windows automáticamente |
-| W009 | Instalador Windows (PyInstaller o NSIS) | ⚪ BACKLOG | Distribuir como .exe o .msi |
+| W001 | Rutas Windows (%APPDATA%, Program Files) | ✅ DONE | Config y binarios en ubicaciones Windows |
+| W002 | Escalación de privilegios con UAC | ✅ DONE | Ejecutar OpenVPN como admin en Windows |
+| W003 | Detección de instalaciones OpenVPN en Windows | ✅ DONE | Buscar en Program Files, registry, PATH |
+| W004 | Descarga de binarios pre-compilados para Windows | ✅ DONE | En Windows no compilamos, descargamos instaladores oficiales |
+| W005 | Autostart en Windows (Registry o Startup folder) | ✅ DONE | Arrancar al login en Windows |
+| W006 | Iconos bundled (sin freedesktop theme) | ✅ DONE | Windows no tiene tema de iconos freedesktop |
+| W007 | KeePassXC CLI en Windows | ✅ DONE | Detectar keepassxc-cli.exe en Program Files |
+| W008 | CI para Windows (GitHub Actions) | ✅ DONE | Testear en Windows automáticamente |
+| W009 | Instalador Windows (PyInstaller o NSIS) | ✅ DONE | Distribuir como .exe o .msi |
 | W010 | Documentación Windows | ⚪ BACKLOG | Guía de instalación y uso en Windows |
 
 ## Desestimados
