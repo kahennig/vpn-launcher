@@ -1,3 +1,4 @@
+# Python
 __pycache__/
 *.py[cod]
 *.egg-info/
@@ -7,6 +8,21 @@ build/
 *.egg
 src/*.egg-info/
 .venv/
+.pytest_cache/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+.project
+.classpath
+.settings/
+
+# Amazon Q
+.amazonq/
+
+# Sensitive files
 *.ovpn
 *.kdbx
-.amazonq/
