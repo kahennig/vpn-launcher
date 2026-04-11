@@ -1035,7 +1035,9 @@ class VPNLauncher(QMainWindow):
     def _get_keepass_creds(self, alias, keepass_entry=""):
         entry = keepass_entry or alias
         keepass_db = Path(self._app_settings.get("keepass_db", "~/Document/Keepass/keepass.kdbx")).expanduser()
+        log.debug("KeePass lookup: entry='%s', db='%s', exists=%s", entry, keepass_db, keepass_db.exists())
         if not keepass_db.exists():
+            log.warning("KeePass DB not found: %s", keepass_db)
             return None, None
         password, ok = QInputDialog.getText(
             self, "KeePass", f"Master password for '{entry}':",
@@ -1044,14 +1046,22 @@ class VPNLauncher(QMainWindow):
         if not ok or not password:
             return None, None
         try:
-            user = subprocess.run(
+            r_user = subprocess.run(
                 ["keepassxc-cli", "show", "-q", "-s", "-a", "Username", str(keepass_db), entry],
                 input=password, capture_output=True, text=True, timeout=10,
-            ).stdout.strip()
-            pwd = subprocess.run(
+            )
+            r_pwd = subprocess.run(
                 ["keepassxc-cli", "show", "-q", "-s", "-a", "Password", str(keepass_db), entry],
                 input=password, capture_output=True, text=True, timeout=10,
-            ).stdout.strip()
+            )
+            user = r_user.stdout.strip()
+            pwd = r_pwd.stdout.strip()
+            if not user or not pwd:
+                log.warning("KeePass lookup failed for '%s': user_rc=%d pwd_rc=%d stderr=%s",
+                            entry, r_user.returncode, r_pwd.returncode,
+                            (r_user.stderr or r_pwd.stderr).strip())
+            else:
+                log.debug("KeePass credentials obtained for '%s'", entry)
         except subprocess.TimeoutExpired:
             return None, None
         finally:
