@@ -22,7 +22,7 @@ from PyQt6.QtWidgets import (
 )
 
 from .paths import openvpn_binary
-from .paths import CONFIG_DIR, LOG_DIR, OPENVPN_PREFIX
+from .paths import CONFIG_DIR, LOG_DIR, OPENVPN_PREFIX, IS_WINDOWS
 from .profiles import load_profiles, save_profiles, load_settings, save_settings
 from . import __version__
 
@@ -1146,6 +1146,16 @@ def main():
         datefmt="%H:%M:%S",
     )
     app = QApplication(sys.argv)
+
+    # Set bundled Breeze icon theme if no system theme available
+    if QIcon.themeName() == "" or IS_WINDOWS:
+        breeze_path = Path(__file__).parent.parent.parent / "share" / "icons"
+        if not breeze_path.is_dir():
+            breeze_path = Path(getattr(sys, '_MEIPASS', '')) / "share" / "icons"
+        if breeze_path.is_dir():
+            QIcon.setThemeSearchPaths([str(breeze_path)] + QIcon.themeSearchPaths())
+            QIcon.setThemeName("breeze")
+
     app.setApplicationName("VPN Launcher")
     app.setOrganizationName("ovpn-launcher")
     app.setDesktopFileName("ovpn-launcher")
