@@ -1,0 +1,17 @@
+[Icon Theme]
+Name=breeze-dark
+Comment=Breeze Dark icon theme (subset for ovpn-launcher)
+Inherits=breeze
+Directories=actions/22,status/22
+
+[actions/22]
+Size=22
+Type=Scalable
+MinSize=16
+MaxSize=48
+
+[status/22]
+Size=22
+Type=Scalable
+MinSize=16
+MaxSize=48

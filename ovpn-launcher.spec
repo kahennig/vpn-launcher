@@ -13,6 +13,7 @@ a = Analysis(
     datas=[
         ('share/icons/ovpn-launcher.svg', 'share/icons'),
         ('share/icons/breeze', 'share/icons/breeze'),
+        ('share/icons/breeze-dark', 'share/icons/breeze-dark'),
     ],
     hiddenimports=['ovpn_launcher', 'ovpn_launcher.app', 'ovpn_launcher.cli',
                    'ovpn_launcher.builder', 'ovpn_launcher.paths', 'ovpn_launcher.profiles'],

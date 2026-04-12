@@ -81,15 +81,16 @@ def _install_openvpn_windows(version, prefix, on_output=None, full_install=False
         if full_install:
             log(f"==> Installing OpenVPN {version} (full, with drivers)...")
             r = subprocess.run(
-                ["powershell", "-Command",
-                 f"Start-Process msiexec -ArgumentList '/i \"{msi_path}\" /qn PRODUCTDIR=\"{dest}\" ADDLOCAL=ALL' -Verb RunAs -Wait"],
+                ["msiexec", "/i", str(msi_path), "/qn",
+                 f"PRODUCTDIR={dest}", "ADDLOCAL=ALL"],
                 capture_output=True, text=True, timeout=120,
             )
         else:
             log(f"==> Extracting OpenVPN {version} binary...")
+            dest.mkdir(parents=True, exist_ok=True)
             r = subprocess.run(
-                ["powershell", "-Command",
-                 f"Start-Process msiexec -ArgumentList '/a \"{msi_path}\" /qn TARGETDIR=\"{dest}\"' -Verb RunAs -Wait"],
+                ["msiexec", "/a", str(msi_path), "/qn",
+                 f"TARGETDIR={dest}"],
                 capture_output=True, text=True, timeout=120,
             )
 

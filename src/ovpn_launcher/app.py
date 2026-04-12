@@ -1154,7 +1154,9 @@ def main():
             breeze_path = Path(getattr(sys, '_MEIPASS', '')) / "share" / "icons"
         if breeze_path.is_dir():
             QIcon.setThemeSearchPaths([str(breeze_path)] + QIcon.themeSearchPaths())
-            QIcon.setThemeName("breeze")
+            pal = app.palette()
+            is_dark = pal.color(QPalette.ColorRole.Window).lightness() < 128
+            QIcon.setThemeName("breeze-dark" if is_dark else "breeze")
 
     app.setApplicationName("VPN Launcher")
     app.setOrganizationName("ovpn-launcher")
