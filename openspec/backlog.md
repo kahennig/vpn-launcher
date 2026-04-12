@@ -78,7 +78,17 @@
 
 | ID | Tarea | Estado | Justificación |
 |----|-------|--------|---------------|
-| L016 | Packaging RPM/Flatpak | ⚪ BACKLOG | Distribución más fácil en Linux |
+| L016 | Packaging Flatpak para Linux | ⚪ BACKLOG | Distribución sandboxed para Linux |
+
+### L016 — Subtareas Flatpak
+
+| ID | Tarea | Estado | Justificación |
+|----|-------|--------|---------------|
+| L016a | Manifest Flatpak (org.ovpnlauncher.App.yml) | ⚪ BACKLOG | Runtime KDE (incluye PyQt6), permisos de red y filesystem |
+| L016b | Adaptar escalación de privilegios para sandbox | ⚪ BACKLOG | pkexec no funciona en sandbox → usar `flatpak-spawn --host pkexec` |
+| L016c | Adaptar acceso a keepassxc-cli en sandbox | ⚪ BACKLOG | keepassxc-cli está en el host → `flatpak-spawn --host keepassxc-cli` |
+| L016d | CI para build Flatpak (GitHub Actions) | ⚪ BACKLOG | Usar `flatpak/flatpak-github-actions/flatpak-builder@v6`, subir .flatpak como artifact |
+| L016e | Publicar en Flathub | ⚪ BACKLOG | Requiere L016a-d completas, review de Flathub |
 
 ## Pendientes — Windows Port
 
