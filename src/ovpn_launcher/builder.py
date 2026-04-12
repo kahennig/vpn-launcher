@@ -59,6 +59,7 @@ def _install_openvpn_windows(version, prefix, on_output=None, full_install=False
         if on_output:
             on_output(msg)
 
+    prefix = os.path.expandvars(str(prefix))
     dest = Path(prefix) / f"openvpn-{version}"
     binary = dest / "bin" / "openvpn.exe"
     if binary.is_file():
@@ -68,6 +69,7 @@ def _install_openvpn_windows(version, prefix, on_output=None, full_install=False
     url = MSI_URL.format(version=version)
     build_dir = Path(tempfile.mkdtemp(prefix="openvpn-install-"))
     msi_path = build_dir / f"OpenVPN-{version}.msi"
+    extract_dir = build_dir / "extracted"
 
     try:
         log(f"==> Downloading OpenVPN {version} MSI...")
@@ -78,38 +80,35 @@ def _install_openvpn_windows(version, prefix, on_output=None, full_install=False
             log("ERROR: Download failed or file too small")
             return False
 
-        if full_install:
-            log(f"==> Installing OpenVPN {version} (full, with drivers)...")
-            r = subprocess.run(
-                ["msiexec", "/i", str(msi_path), "/qn",
-                 f"PRODUCTDIR={dest}", "ADDLOCAL=ALL"],
-                capture_output=True, text=True, timeout=120,
-            )
-        else:
-            log(f"==> Extracting OpenVPN {version} binary...")
-            dest.mkdir(parents=True, exist_ok=True)
-            r = subprocess.run(
-                ["msiexec", "/a", str(msi_path), "/qn",
-                 f"TARGETDIR={dest}"],
-                capture_output=True, text=True, timeout=120,
-            )
-
+        log(f"==> Extracting OpenVPN {version} binary...")
+        extract_dir.mkdir(parents=True, exist_ok=True)
+        r = subprocess.run(
+            ["msiexec", "/a", str(msi_path), "/qn",
+             f"TARGETDIR={extract_dir}"],
+            capture_output=True, text=True, timeout=120,
+        )
         if r.returncode != 0:
-            log(f"ERROR: Install failed (code {r.returncode}):\n{r.stderr[-500:] if r.stderr else 'no output'}")
+            log(f"ERROR: Extract failed (code {r.returncode})")
             return False
 
-        # msiexec /a may nest files; find openvpn.exe
-        found = list(dest.rglob("openvpn.exe"))
-        if found and found[0] != binary:
-            binary.parent.mkdir(parents=True, exist_ok=True)
-            import shutil
-            shutil.move(str(found[0]), str(binary))
+        # msiexec /a creates nested structure — find openvpn.exe anywhere
+        found = list(extract_dir.rglob("openvpn.exe"))
+        if not found:
+            log("ERROR: openvpn.exe not found in extracted MSI")
+            log(f"Extracted contents: {[str(p.relative_to(extract_dir)) for p in extract_dir.rglob('*') if p.is_file()][:20]}")
+            return False
+
+        import shutil
+        dest.mkdir(parents=True, exist_ok=True)
+        binary.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(str(found[0]), str(binary))
+        log(f"Found openvpn.exe at: {found[0].relative_to(extract_dir)}")
 
         if binary.is_file():
             log(f"==> Done! OpenVPN {version} installed at {dest}")
             return True
         else:
-            log("ERROR: openvpn.exe not found after install")
+            log("ERROR: Failed to copy openvpn.exe")
             return False
 
     except subprocess.TimeoutExpired:
