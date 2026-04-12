@@ -118,7 +118,7 @@ def detect_versions(prefix=None):
     if system_bin.is_file():
         try:
             ver = subprocess.run(
-                [str(system_bin), "--version"], capture_output=True, text=True
+                [str(system_bin), "--version"], capture_output=True, text=True, timeout=3,
             ).stdout.split()[1]
         except Exception:
             ver = "?"
