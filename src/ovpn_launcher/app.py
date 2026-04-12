@@ -1155,8 +1155,13 @@ def main():
         if breeze_path.is_dir():
             QIcon.setThemeSearchPaths([str(breeze_path)] + QIcon.themeSearchPaths())
             pal = app.palette()
-            is_dark = pal.color(QPalette.ColorRole.Window).lightness() < 128
-            QIcon.setThemeName("breeze-dark" if is_dark else "breeze")
+            lightness = pal.color(QPalette.ColorRole.Window).lightness()
+            is_dark = lightness < 128
+            theme = "breeze-dark" if is_dark else "breeze"
+            QIcon.setThemeName(theme)
+            log.info("Icon theme: %s (window lightness: %d)", theme, lightness)
+        else:
+            log.warning("Breeze icons not found at %s", breeze_path)
 
     app.setApplicationName("VPN Launcher")
     app.setOrganizationName("ovpn-launcher")
