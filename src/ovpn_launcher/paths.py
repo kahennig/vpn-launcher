@@ -34,6 +34,7 @@ OPENVPN_GLOB = "openvpn-*/bin/openvpn.exe" if IS_WINDOWS else "openvpn-*/sbin/op
 
 
 def openvpn_binary(version: str, prefix: Path = OPENVPN_PREFIX) -> Path:
+    prefix = Path(os.path.expandvars(str(prefix)))
     if version == "system":
         if IS_WINDOWS:
             return Path(os.environ.get("PROGRAMFILES", "C:/Program Files")) / "OpenVPN" / "bin" / "openvpn.exe"

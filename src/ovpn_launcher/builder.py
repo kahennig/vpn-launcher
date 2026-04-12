@@ -32,7 +32,7 @@ def fetch_available_versions():
 
 
 def installed_versions(prefix="/opt"):
-    p = Path(prefix)
+    p = Path(os.path.expandvars(str(prefix)))
     versions = []
     for d in sorted(p.glob(OPENVPN_GLOB)):
         if d.is_file():

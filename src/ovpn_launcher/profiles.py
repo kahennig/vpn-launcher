@@ -112,7 +112,7 @@ def migrate_legacy_config(legacy_path=None, yaml_path=None):
 
 
 def detect_versions(prefix=None):
-    p = Path(prefix) if prefix else OPENVPN_PREFIX
+    p = Path(os.path.expandvars(str(prefix))) if prefix else OPENVPN_PREFIX
     versions = []
     system_bin = openvpn_binary("system")
     if system_bin.is_file():
