@@ -7,14 +7,14 @@ import sys
 block_cipher = None
 
 a = Analysis(
-    ['src/ovpn_launcher/app.py'],
-    pathex=[],
+    ['launcher.py'],
+    pathex=['src'],
     binaries=[],
     datas=[
         ('share/icons/ovpn-launcher.svg', 'share/icons'),
-        ('share/icons/ovpn-launcher.ico', 'share/icons'),
     ],
-    hiddenimports=['ovpn_launcher'],
+    hiddenimports=['ovpn_launcher', 'ovpn_launcher.app', 'ovpn_launcher.cli',
+                   'ovpn_launcher.builder', 'ovpn_launcher.paths', 'ovpn_launcher.profiles'],
     hookspath=[],
     hooksconfig={},
     runtime_hooks=[],
@@ -47,5 +47,5 @@ exe = EXE(
     target_arch=None,
     codesign_identity=None,
     entitlements_file=None,
-    icon='share/icons/ovpn-launcher.ico',
+    icon=None,
 )
