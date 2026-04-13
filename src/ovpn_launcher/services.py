@@ -137,6 +137,33 @@ def windows_driver_args():
     return ["--windows-driver", "wintun"]
 
 
+_system_version_cache = None
+
+
+def get_system_version(binary=None):
+    """Get the version string of the system OpenVPN binary (cached).
+
+    Returns version string (e.g. '2.6.14') or '' if not found.
+    """
+    global _system_version_cache
+    if _system_version_cache is not None:
+        return _system_version_cache
+    if binary is None:
+        from .paths import openvpn_binary
+        binary = openvpn_binary("system")
+    try:
+        if not Path(str(binary)).is_file():
+            _system_version_cache = ""
+            return ""
+        r = subprocess.run(
+            [str(binary), "--version"], capture_output=True, text=True, timeout=5,
+        )
+        _system_version_cache = r.stdout.split()[1] if r.stdout else ""
+    except Exception:
+        _system_version_cache = ""
+    return _system_version_cache
+
+
 def is_interactive_service_running():
     """Check if OpenVPN Interactive Service is running (Windows only).
 
@@ -144,14 +171,17 @@ def is_interactive_service_running():
     """
     if not IS_WINDOWS:
         return True
-    try:
-        r = subprocess.run(
-            ["sc", "query", "OpenVPNServiceInteractive"],
-            capture_output=True, text=True, timeout=5,
-        )
-        return "RUNNING" in r.stdout
-    except Exception:
-        return False
+    for svc_name in ("OpenVPNServiceInteractive", "OpenVPNService", "openvpnserv2"):
+        try:
+            r = subprocess.run(
+                ["sc", "query", svc_name],
+                capture_output=True, text=True, timeout=5,
+            )
+            if "RUNNING" in r.stdout:
+                return True
+        except Exception:
+            pass
+    return False
 
 
 def list_tap_adapters():

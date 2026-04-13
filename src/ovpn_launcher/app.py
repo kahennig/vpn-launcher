@@ -34,6 +34,7 @@ from .services import (
     elevate_command, kill_command, fetch_public_ip, dns_resolver_ip,
     is_autostart_enabled, enable_autostart, disable_autostart,
     windows_driver_args, is_interactive_service_running, list_tap_adapters,
+    get_system_version,
 )
 
 log = logging.getLogger(__name__)
@@ -892,8 +893,9 @@ class VPNLauncher(QMainWindow):
             args += ["--auth-user-pass", self.auth_file.name]
 
         self.process = QProcess(self)
-        self.process.setProgram(elevate_command([binary], gui=True)[0])
-        self.process.setArguments(elevate_command([binary], gui=True)[1:] + args)
+        full_cmd = elevate_command([binary] + args, gui=True)
+        self.process.setProgram(full_cmd[0])
+        self.process.setArguments(full_cmd[1:])
         self.process.setProcessChannelMode(QProcess.ProcessChannelMode.MergedChannels)
         self.process.readyReadStandardOutput.connect(self._on_read_output)
         self.process.finished.connect(self._on_process_finished)
@@ -1221,6 +1223,9 @@ def main():
     splash = QSplashScreen(pixmap)
     splash.show()
     splash.showMessage("Loading…", Qt.AlignmentFlag.AlignBottom | Qt.AlignmentFlag.AlignHCenter, QColor("#7f8c8d"))
+    app.processEvents()
+
+    get_system_version()
     app.processEvents()
 
     window = VPNLauncher()

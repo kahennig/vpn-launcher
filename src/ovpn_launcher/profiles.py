@@ -111,17 +111,15 @@ def migrate_legacy_config(legacy_path=None, yaml_path=None):
     _save_yaml(data, yaml_path)
 
 
+from .services import get_system_version
+
+
 def detect_versions(prefix=None):
     p = Path(os.path.expandvars(str(prefix))) if prefix else OPENVPN_PREFIX
     versions = []
     system_bin = openvpn_binary("system")
     if system_bin.is_file():
-        try:
-            ver = subprocess.run(
-                [str(system_bin), "--version"], capture_output=True, text=True, timeout=3,
-            ).stdout.split()[1]
-        except Exception:
-            ver = "?"
+        ver = get_system_version(system_bin) or "?"
         versions.append(f"system ({ver})")
     for d in sorted(p.glob(OPENVPN_GLOB)):
         if d.is_file():

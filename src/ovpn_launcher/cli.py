@@ -13,7 +13,7 @@ from pathlib import Path
 from . import __version__
 from .paths import openvpn_binary
 from .profiles import load_profiles, save_profiles, load_settings, detect_versions, VALID_AUTH_MODES
-from .services import elevate_command, fetch_keepass_creds, windows_driver_args, is_interactive_service_running
+from .services import elevate_command, fetch_keepass_creds, windows_driver_args, is_interactive_service_running, get_system_version
 from .paths import IS_WINDOWS
 
 
@@ -21,14 +21,8 @@ def cmd_list(settings):
     prefix = Path(settings.get("openvpn_prefix", "/opt"))
     print("Installed versions:")
     for v in detect_versions(prefix):
-        if v == "system":
-            try:
-                ver = subprocess.run(
-                    ["openvpn", "--version"], capture_output=True, text=True
-                ).stdout.split()[1]
-            except Exception:
-                ver = "?"
-            print(f"  system ({ver})")
+        if v.startswith("system"):
+            print(f"  {v}")
         else:
             print(f"  {v}")
     print()
