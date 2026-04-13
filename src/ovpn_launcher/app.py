@@ -1147,6 +1147,9 @@ def main():
     )
     app = QApplication(sys.argv)
 
+    if IS_WINDOWS:
+        app.setStyle("Fusion")
+
     # Set bundled Breeze icon theme if no system theme available
     if QIcon.themeName() == "" or IS_WINDOWS:
         breeze_path = Path(__file__).parent.parent.parent / "share" / "icons"

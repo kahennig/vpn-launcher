@@ -99,10 +99,17 @@ def _install_openvpn_windows(version, prefix, on_output=None, full_install=False
             return False
 
         import shutil
+        src_bin = found[0].parent
         dest.mkdir(parents=True, exist_ok=True)
         binary.parent.mkdir(parents=True, exist_ok=True)
-        shutil.copy2(str(found[0]), str(binary))
-        log(f"Found openvpn.exe at: {found[0].relative_to(extract_dir)}")
+
+        # Copy openvpn.exe + all required DLLs from the same directory
+        copied = []
+        for f in src_bin.iterdir():
+            if f.is_file() and f.suffix.lower() in (".exe", ".dll"):
+                shutil.copy2(str(f), str(binary.parent / f.name))
+                copied.append(f.name)
+        log(f"Copied {len(copied)} files: {', '.join(sorted(copied))}")
 
         if binary.is_file():
             log(f"==> Done! OpenVPN {version} installed at {dest}")
