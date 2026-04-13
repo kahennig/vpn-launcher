@@ -119,7 +119,7 @@
 | W010 | Documentación Windows | ⚪ BACKLOG | Guía de instalación y uso en Windows |
 | W011 | Flag --windows-driver wintun al conectar | ✅ DONE | OpenVPN necesita saber qué driver usar; sin el flag puede fallar la conexión |
 | W012 | Verificar OpenVPN Interactive Service antes de conectar | ✅ DONE | Sin el servicio, OpenVPN necesita admin y puede quedar "conectado" sin tráfico real |
-| W013 | Exponer tapctl.exe para listar/crear adaptadores | ⚪ BACKLOG | Diagnóstico y soporte para múltiples adaptadores virtuales |
+| W013 | Exponer tapctl.exe para listar/crear adaptadores | ✅ DONE | Diagnóstico y soporte para múltiples adaptadores virtuales |
 | W014 | Escalación de privilegios real en Windows (UAC o Interactive Service) | ⚪ BACKLOG | elevate_command() en Windows no eleva; sin servicio ni admin la conexión falla silenciosamente |
 | W015 | Management Interface (--management 127.0.0.1 port) | ⚪ BACKLOG | Monitoreo confiable de estado, bytecount y control limpio vía TCP socket en vez de parsear stdout |
 | W016 | Base install silencioso del primer OpenVPN (MSI con drivers y servicio) | ⚪ BACKLOG | Instalar drivers Wintun/TAP y Interactive Service automáticamente en el primer setup |

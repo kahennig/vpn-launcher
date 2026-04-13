@@ -33,7 +33,7 @@ from .services import (
     export_profile_zip, import_profile_zip, fetch_keepass_creds,
     elevate_command, kill_command, fetch_public_ip, dns_resolver_ip,
     is_autostart_enabled, enable_autostart, disable_autostart,
-    windows_driver_args, is_interactive_service_running,
+    windows_driver_args, is_interactive_service_running, list_tap_adapters,
 )
 
 log = logging.getLogger(__name__)
@@ -156,6 +156,11 @@ class VPNLauncher(QMainWindow):
         self.action_dns_check = QAction(_themed_icon("network-server", SP.SP_DriveNetIcon), "&DNS Check", self)
         self.action_dns_check.setToolTip("Check DNS resolver (leak test)")
         self.action_dns_check.triggered.connect(self.on_dns_check)
+
+        self.action_list_adapters = QAction(_themed_icon("network-wired", SP.SP_DriveNetIcon), "List &Adapters", self)
+        self.action_list_adapters.setToolTip("List virtual network adapters (tapctl)")
+        self.action_list_adapters.triggered.connect(self.on_list_adapters)
+        self.action_list_adapters.setVisible(IS_WINDOWS)
 
         self.action_build = QAction(_themed_icon("run-build", SP.SP_CommandLink), "Build Open&VPN", self)
         self.action_build.setToolTip("Download and compile an OpenVPN version")
@@ -343,6 +348,7 @@ class VPNLauncher(QMainWindow):
         hamburger_menu.addSeparator()
         hamburger_menu.addAction(self.action_ping)
         hamburger_menu.addAction(self.action_dns_check)
+        hamburger_menu.addAction(self.action_list_adapters)
         hamburger_menu.addAction(self.action_build)
         hamburger_menu.addAction(self.action_open_configs)
         hamburger_menu.addAction(self.action_open_logs)
@@ -736,6 +742,15 @@ class VPNLauncher(QMainWindow):
                 Q_ARG(str, msg),
             )
         threading.Thread(target=_run, daemon=True).start()
+
+    def on_list_adapters(self):
+        adapters = list_tap_adapters()
+        if not adapters:
+            self._log_append("-- No virtual adapters found (tapctl not available) --")
+            return
+        self._log_append(f"-- Virtual adapters ({len(adapters)}): --")
+        for guid, name in adapters:
+            self._log_append(f"  {name}  {guid}")
 
     # ── Profile Loading ──────────────────────────────────────────────
 

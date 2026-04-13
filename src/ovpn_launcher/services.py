@@ -154,6 +154,38 @@ def is_interactive_service_running():
         return False
 
 
+def list_tap_adapters():
+    """List virtual network adapters via tapctl.exe (Windows only).
+
+    Returns list of (guid, name) tuples, or empty list on Linux/error.
+    """
+    if not IS_WINDOWS:
+        return []
+    # Search tapctl.exe in known OpenVPN install locations
+    candidates = []
+    for base in [Path(os.environ.get("PROGRAMFILES", "C:\\Program Files")),
+                 Path(os.environ.get("LOCALAPPDATA", "")) / "ovpn-launcher" / "openvpn"]:
+        candidates.extend(base.rglob("tapctl.exe"))
+    tapctl = next((str(c) for c in candidates if c.is_file()), None)
+    if not tapctl:
+        tapctl = shutil.which("tapctl")
+    if not tapctl:
+        return []
+    try:
+        r = subprocess.run(
+            [tapctl, "list"], capture_output=True, text=True, timeout=10,
+        )
+        adapters = []
+        for line in r.stdout.strip().splitlines():
+            # Format: {GUID} AdapterName
+            parts = line.strip().split(None, 1)
+            if len(parts) == 2:
+                adapters.append((parts[0], parts[1]))
+        return adapters
+    except Exception:
+        return []
+
+
 def elevate_command(command, gui=False):
     """Wrap a command list with privilege escalation for the current platform."""
     if IS_WINDOWS:
