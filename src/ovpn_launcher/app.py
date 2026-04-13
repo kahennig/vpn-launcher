@@ -257,6 +257,7 @@ class VPNLauncher(QMainWindow):
             "<p><b>Andreas Hennig</b><br>Author &amp; Maintainer</p>"
             '<p><a href="mailto:kahennig.work@gmail.com">kahennig.work@gmail.com</a></p>'
             '<p><a href="https://github.com/kahennig/vpn-launcher">github.com/kahennig/vpn-launcher</a></p>'
+            "<p>© 2026</p>"
         )
         author_tab.setOpenExternalLinks(True)
         tabs.addTab(author_tab, "Author")
