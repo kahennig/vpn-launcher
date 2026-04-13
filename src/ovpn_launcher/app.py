@@ -33,7 +33,7 @@ from .services import (
     export_profile_zip, import_profile_zip, fetch_keepass_creds,
     elevate_command, kill_command, fetch_public_ip, dns_resolver_ip,
     is_autostart_enabled, enable_autostart, disable_autostart,
-    windows_driver_args,
+    windows_driver_args, is_interactive_service_running,
 )
 
 log = logging.getLogger(__name__)
@@ -839,6 +839,18 @@ class VPNLauncher(QMainWindow):
             ans = QMessageBox.warning(
                 self, "Config Warning",
                 f"Config file may be incomplete.\nMissing directives: {', '.join(missing)}\n\nConnect anyway?",
+                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+            )
+            if ans != QMessageBox.StandardButton.Yes:
+                return
+
+        if IS_WINDOWS and not is_interactive_service_running():
+            ans = QMessageBox.warning(
+                self, "Service Not Running",
+                "OpenVPN Interactive Service is not running.\n"
+                "Connections may fail or route traffic incorrectly.\n\n"
+                "Install OpenVPN fully (MSI) to set up the service,\n"
+                "or run this app as Administrator.\n\nConnect anyway?",
                 QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
             )
             if ans != QMessageBox.StandardButton.Yes:

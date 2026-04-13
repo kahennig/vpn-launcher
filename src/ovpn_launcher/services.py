@@ -137,6 +137,23 @@ def windows_driver_args():
     return ["--windows-driver", "wintun"]
 
 
+def is_interactive_service_running():
+    """Check if OpenVPN Interactive Service is running (Windows only).
+
+    Returns True on Linux (not needed), or True/False on Windows.
+    """
+    if not IS_WINDOWS:
+        return True
+    try:
+        r = subprocess.run(
+            ["sc", "query", "OpenVPNServiceInteractive"],
+            capture_output=True, text=True, timeout=5,
+        )
+        return "RUNNING" in r.stdout
+    except Exception:
+        return False
+
+
 def elevate_command(command, gui=False):
     """Wrap a command list with privilege escalation for the current platform."""
     if IS_WINDOWS:
