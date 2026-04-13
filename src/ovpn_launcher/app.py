@@ -34,7 +34,7 @@ from .services import (
     elevate_command, kill_command, fetch_public_ip, dns_resolver_ip,
     is_autostart_enabled, enable_autostart, disable_autostart,
     windows_driver_args, is_interactive_service_running, list_tap_adapters,
-    get_system_version,
+    get_system_version, ensure_adapter,
 )
 
 log = logging.getLogger(__name__)
@@ -1226,6 +1226,7 @@ def main():
     app.processEvents()
 
     get_system_version()
+    ensure_adapter()
     app.processEvents()
 
     window = VPNLauncher()

@@ -130,10 +130,62 @@ def fetch_keepass_creds(entry, db_path, master_password):
         return None, None
 
 
+ADAPTER_NAME = "ovpn-launcher"
+
+
+def _find_tapctl():
+    """Find tapctl.exe. Returns path string or None."""
+    if not IS_WINDOWS:
+        return None
+    found = shutil.which("tapctl")
+    if found:
+        return found
+    for base in [Path(os.environ.get("PROGRAMFILES", "C:\\Program Files")),
+                 Path(os.environ.get("LOCALAPPDATA", "")) / "ovpn-launcher" / "openvpn"]:
+        for p in base.rglob("tapctl.exe"):
+            if p.is_file():
+                return str(p)
+    return None
+
+
+def ensure_adapter():
+    """Ensure a dedicated wintun adapter exists for ovpn-launcher (Windows only).
+
+    Returns True if the adapter is available, False otherwise.
+    """
+    if not IS_WINDOWS:
+        return False
+    # Check if adapter already exists
+    for _guid, name in list_tap_adapters():
+        if name == ADAPTER_NAME:
+            return True
+    # Create it
+    tapctl = _find_tapctl()
+    if not tapctl:
+        log.warning("tapctl.exe not found, cannot create adapter")
+        return False
+    try:
+        r = subprocess.run(
+            [tapctl, "create", "--hwid", "wintun", "--name", ADAPTER_NAME],
+            capture_output=True, text=True, timeout=15,
+        )
+        if r.returncode == 0:
+            log.info("Created wintun adapter '%s'", ADAPTER_NAME)
+            return True
+        log.warning("tapctl create failed: %s", r.stderr.strip())
+    except Exception as e:
+        log.warning("Failed to create adapter: %s", e)
+    return False
+
+
 def windows_driver_args():
-    """Return extra OpenVPN args for Windows driver selection."""
-    # Let OpenVPN auto-select the available driver (wintun or tap-windows6).
-    # Forcing --windows-driver can fail if the adapter is already in use.
+    """Return extra OpenVPN args to use the dedicated adapter on Windows."""
+    if not IS_WINDOWS:
+        return []
+    # Use our dedicated adapter if available
+    for _guid, name in list_tap_adapters():
+        if name == ADAPTER_NAME:
+            return ["--windows-driver", "wintun", "--dev-node", ADAPTER_NAME]
     return []
 
 
@@ -191,14 +243,7 @@ def list_tap_adapters():
     """
     if not IS_WINDOWS:
         return []
-    # Search tapctl.exe in known OpenVPN install locations
-    candidates = []
-    for base in [Path(os.environ.get("PROGRAMFILES", "C:\\Program Files")),
-                 Path(os.environ.get("LOCALAPPDATA", "")) / "ovpn-launcher" / "openvpn"]:
-        candidates.extend(base.rglob("tapctl.exe"))
-    tapctl = next((str(c) for c in candidates if c.is_file()), None)
-    if not tapctl:
-        tapctl = shutil.which("tapctl")
+    tapctl = _find_tapctl()
     if not tapctl:
         return []
     try:
