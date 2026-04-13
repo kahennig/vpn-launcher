@@ -23,10 +23,11 @@ jobs:
       - name: Build exe
         run: pyinstaller ovpn-launcher.spec
 
+      - name: Install NSIS
+        run: choco install nsis -y
+
       - name: Build NSIS installer
-        uses: joncloud/makensis-action@v4
-        with:
-          script-file: installer.nsi
+        run: makensis installer.nsi
 
       - name: Upload exe artifact
         uses: actions/upload-artifact@v5

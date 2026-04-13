@@ -2,13 +2,19 @@
 
 ## Description
 
-VPN Launcher is a multi-version OpenVPN connection manager for Linux. It lets you manage multiple VPN profiles, each pinned to a specific OpenVPN version, with optional KeePass credential integration.
+VPN Launcher is a multi-version OpenVPN connection manager for Linux and Windows. It lets you manage multiple VPN profiles, each pinned to a specific OpenVPN version, with optional KeePass credential integration.
 
 ## Getting Started
 
+### Linux
 1. Launch the app: `ovpn-app` or from your application menu (VPN Launcher)
 2. Add a profile: click **Add Profile** in the toolbar (or `Ctrl+N`)
 3. Select a profile and click **Connect** (or double-click)
+
+### Windows
+1. Run the installer (`ovpn-launcher-setup.exe`) or the standalone `ovpn-launcher.exe`
+2. The app requests Administrator privileges on launch (required for OpenVPN routing)
+3. Add a profile and connect as above
 
 ## Main Window
 
@@ -26,7 +32,8 @@ All actions are accessible from the hamburger menu at the right end of the toolb
 - Connect / Disconnect
 - Add, Edit, Remove profiles
 - Import .ovpn, Import Profile (.zip), Export Profile
-- Ping Server, DNS Check, Build OpenVPN
+- Ping Server, DNS Check, List Adapters (Windows), Build OpenVPN
+- Open Configs Folder, Open Logs Folder
 - Reload, Clear Log, Copy Log
 - Start at Login, Settings
 - About, Quit
@@ -122,6 +129,7 @@ Settings are stored in `~/.config/ovpn-launcher/config.yaml`.
 
 - **Ping Server** (☰ menu): pings the VPN server from the .ovpn config and shows latency in the log
 - **DNS Check** (☰ menu): shows the current DNS resolver IP to detect DNS leaks
+- **List Adapters** (☰ menu, Windows only): lists virtual network adapters (wintun/TAP) via `tapctl.exe`
 - **Public IP**: displayed in the status bar, updates on connect/disconnect
 
 ## Connection Log
@@ -133,6 +141,13 @@ Settings are stored in `~/.config/ovpn-launcher/config.yaml`.
 - Logs are saved to `~/.config/ovpn-launcher/logs/{alias}_{timestamp}.log`
 
 ## Configuration
+
+### Config File Location
+
+| Platform | Path |
+|----------|------|
+| Linux | `~/.config/ovpn-launcher/config.yaml` |
+| Windows | `%APPDATA%\ovpn-launcher\config.yaml` |
 
 ### Config File (YAML)
 
@@ -167,7 +182,9 @@ profiles:
 
 ### Autostart
 
-Enable from ☰ → Start at Login. Creates a .desktop file in `~/.config/autostart/`.
+Enable from ☰ → Start at Login.
+- **Linux**: creates a `.desktop` file in `~/.config/autostart/`
+- **Windows**: creates a `.vbs` script in the Startup folder
 
 ## Keyboard Shortcuts
 
@@ -201,7 +218,9 @@ ovpn-connect --version                # show version
 ## Troubleshooting
 
 ### OpenVPN binary not found
-Build the version from the GUI (Build OpenVPN button) or use `system` to use `/usr/bin/openvpn`.
+Build the version from the GUI (Build OpenVPN button) or use `system` to use the system-installed OpenVPN.
+- **Linux**: system binary at `/usr/bin/openvpn`, compiled versions at `/opt/openvpn-<ver>/sbin/openvpn`
+- **Windows**: system binary at `C:\Program Files\OpenVPN\bin\openvpn.exe`, extracted versions at `%LOCALAPPDATA%\ovpn-launcher\openvpn\openvpn-<ver>\bin\openvpn.exe`
 
 ### KeePass credentials not found
 The KeePass entry title must match the `keepass_entry` field (or the alias if not set). Ensure the KeePass DB path is correct in Settings.
@@ -214,3 +233,12 @@ If a profile shows a ⚠ warning icon, hover over it to see what's missing (bina
 
 ### Tray icon not showing
 Ensure your desktop environment supports system tray icons. On KDE Plasma this works out of the box. On GNOME you may need the AppIndicator extension.
+
+### Windows: Access denied / routes not working
+The app must run as Administrator for OpenVPN to modify routing tables. The installer and PyInstaller exe request admin automatically via UAC. If running from source, right-click → Run as Administrator.
+
+### Windows: Adapter in use
+If you see "All wintun adapters are currently in use", another OpenVPN instance (e.g. OpenVPN GUI) is using the adapter. The app creates a dedicated `ovpn-launcher` adapter on startup to avoid conflicts. If it fails, close other OpenVPN instances first.
+
+### Windows: Interactive Service warning
+If you see a warning about the OpenVPN Interactive Service, install OpenVPN fully via its official MSI installer to set up the service and drivers.

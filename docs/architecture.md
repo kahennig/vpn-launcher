@@ -37,11 +37,13 @@
 
 | Module | Responsibility |
 |--------|---------------|
-| `app.py` | PyQt6 GUI: VPNLauncher, ProfileDialog, SettingsDialog, BuildDialog |
+| `app.py` | PyQt6 GUI: VPNLauncher, main(), splash, auto-elevation (Windows) |
 | `cli.py` | Python CLI: argparse, connect, add, edit, remove, list, status |
+| `dialogs.py` | GUI dialogs: ProfileDialog, SettingsDialog, BuildDialog |
+| `services.py` | Pure business logic (no Qt): log colors, ovpn validation, import/export, KeePass, elevation, IP/DNS, autostart, adapter management |
 | `profiles.py` | YAML config: load/save profiles, load/save settings, migration, detect_versions |
-| `paths.py` | Path constants: CONFIG_DIR, CONFIG_YAML, LOG_DIR, AUTOSTART, openvpn_binary() |
-| `builder.py` | OpenVPN build: fetch_available_versions (GitHub API), build_openvpn (download, compile, install) |
+| `paths.py` | Path constants: CONFIG_DIR, CONFIG_YAML, LOG_DIR, AUTOSTART, openvpn_binary(), IS_WINDOWS |
+| `builder.py` | OpenVPN build: fetch_available_versions (GitHub API), build (Linux) / install from MSI (Windows) |
 
 ## Connection Flow
 
@@ -96,8 +98,18 @@ Legacy `connections.conf` (pipe-delimited) is auto-migrated on first load.
 
 ## Privilege Escalation
 
-- GUI uses `pkexec` (Polkit) — required because sudo doesn't work well with graphical apps
-- CLI uses `sudo` — standard for terminal usage
+- **Linux GUI**: `pkexec` (Polkit) — required because sudo doesn't work well with graphical apps
+- **Linux CLI**: `sudo` — standard for terminal usage
+- **Windows**: UAC elevation — the app auto-relaunches as admin on startup; PyInstaller exe has `uac_admin=True` manifest
+
+## Windows-Specific Features
+
+- **MSI extraction**: OpenVPN versions are extracted from official MSI packages (exe + DLLs)
+- **Dedicated adapter**: creates a `ovpn-launcher` wintun adapter via `tapctl.exe` to avoid conflicts with OpenVPN GUI
+- **Interactive Service detection**: checks `OpenVPNServiceInteractive`, `OpenVPNService`, `openvpnserv2`
+- **Fusion style**: uses Qt Fusion style for consistent cross-platform look
+- **Breeze icons**: bundled breeze/breeze-dark icon themes (auto-selected by system lightness)
+- **NSIS installer**: `installer.nsi` builds a setup wizard with Start Menu, Desktop shortcut, and uninstaller
 
 ## GUI Features
 
@@ -127,6 +139,7 @@ Legacy `connections.conf` (pipe-delimited) is auto-migrated on first load.
 
 ## OpenVPN Version Management
 
+### Linux
 Versions are compiled from source to isolated prefixes:
 
 ```
@@ -137,7 +150,21 @@ Versions are compiled from source to isolated prefixes:
 └── share/
 ```
 
-Available versions are fetched from GitHub API (`OpenVPN/openvpn` tags). The `--disable-dco` flag is used during compilation.
+### Windows
+Versions are extracted from official MSI packages:
+
+```
+%LOCALAPPDATA%\ovpn-launcher\openvpn\openvpn-2.6.14\
+└── bin/
+    ├── openvpn.exe
+    ├── libssl-3-x64.dll
+    ├── libcrypto-3-x64.dll
+    ├── lzo2.dll
+    ├── pkcs11-helper-1.dll
+    └── tapctl.exe
+```
+
+Available versions are fetched from GitHub API (`OpenVPN/openvpn` tags). On Linux, the `--disable-dco` flag is used during compilation.
 
 ## Settings
 
