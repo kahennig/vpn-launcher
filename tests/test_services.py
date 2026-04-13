@@ -2,6 +2,7 @@
 
 import socket
 import subprocess
+import sys
 import zipfile
 from pathlib import Path
 from unittest.mock import patch, MagicMock
@@ -267,9 +268,11 @@ class TestDnsResolverIp:
 
 class TestAutostart:
     def test_enable_disable_cycle(self, tmp_path):
-        autostart_file = tmp_path / "autostart" / "test.desktop"
+        ext = ".lnk" if sys.platform == "win32" else ".desktop"
+        autostart_file = tmp_path / "autostart" / f"test{ext}"
         with patch("ovpn_launcher.services.AUTOSTART_DIR", tmp_path / "autostart"), \
-             patch("ovpn_launcher.services.AUTOSTART_FILE", autostart_file):
+             patch("ovpn_launcher.services.AUTOSTART_FILE", autostart_file), \
+             patch("ovpn_launcher.services.IS_WINDOWS", sys.platform == "win32"):
             assert not is_autostart_enabled()
             enable_autostart()
             assert is_autostart_enabled()
