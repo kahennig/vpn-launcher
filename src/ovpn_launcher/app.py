@@ -33,6 +33,7 @@ from .services import (
     export_profile_zip, import_profile_zip, fetch_keepass_creds,
     elevate_command, kill_command, fetch_public_ip, dns_resolver_ip,
     is_autostart_enabled, enable_autostart, disable_autostart,
+    windows_driver_args,
 )
 
 log = logging.getLogger(__name__)
@@ -843,7 +844,7 @@ class VPNLauncher(QMainWindow):
             if ans != QMessageBox.StandardButton.Yes:
                 return
 
-        args = ["--config", config]
+        args = ["--config", config] + windows_driver_args()
         auth_mode = profile["auth_mode"]
 
         user, pwd = None, None

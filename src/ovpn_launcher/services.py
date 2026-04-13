@@ -130,6 +130,13 @@ def fetch_keepass_creds(entry, db_path, master_password):
         return None, None
 
 
+def windows_driver_args():
+    """Return extra OpenVPN args for Windows driver selection."""
+    if not IS_WINDOWS:
+        return []
+    return ["--windows-driver", "wintun"]
+
+
 def elevate_command(command, gui=False):
     """Wrap a command list with privilege escalation for the current platform."""
     if IS_WINDOWS:
