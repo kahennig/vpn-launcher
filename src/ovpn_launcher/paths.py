@@ -10,7 +10,7 @@ if IS_WINDOWS:
     _config_base = Path(os.environ.get("APPDATA", Path.home() / "AppData" / "Roaming"))
     CONFIG_DIR = _config_base / "ovpn-launcher"
     AUTOSTART_DIR = _config_base / "Microsoft" / "Windows" / "Start Menu" / "Programs" / "Startup"
-    AUTOSTART_FILE = AUTOSTART_DIR / "ovpn-launcher.vbs"
+    AUTOSTART_FILE = AUTOSTART_DIR / "ovpn-launcher.lnk"
     OPENVPN_PREFIX = Path(os.environ.get("LOCALAPPDATA", Path.home() / "AppData" / "Local")) / "ovpn-launcher" / "openvpn"
     KEEPASS_DB = Path(os.environ.get(
         "OVPN_KEEPASS_DB",

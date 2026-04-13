@@ -116,7 +116,7 @@
 | W007 | KeePassXC CLI en Windows | ✅ DONE | Detectar keepassxc-cli.exe en Program Files |
 | W008 | CI para Windows (GitHub Actions) | ✅ DONE | Testear en Windows automáticamente |
 | W009 | Instalador Windows (PyInstaller o NSIS) | ✅ DONE | Distribuir como .exe o .msi |
-| W010 | Documentación Windows | ⚪ BACKLOG | Guía de instalación y uso en Windows |
+| W010 | Documentación Windows | ✅ DONE | Guía de instalación y uso en Windows |
 | W011 | Flag --windows-driver wintun al conectar | ✅ DONE | OpenVPN necesita saber qué driver usar; sin el flag puede fallar la conexión |
 | W012 | Verificar OpenVPN Interactive Service antes de conectar | ✅ DONE | Sin el servicio, OpenVPN necesita admin y puede quedar "conectado" sin tráfico real |
 | W013 | Exponer tapctl.exe para listar/crear adaptadores | ✅ DONE | Diagnóstico y soporte para múltiples adaptadores virtuales |

@@ -159,6 +159,5 @@ docs/
 
 - [ ] W015: Management Interface (--management TCP socket) for reliable monitoring
 - [ ] W016: Base install of first OpenVPN via MSI (drivers + Interactive Service)
-- [ ] W010: Windows user documentation
 - [ ] L016: Flatpak packaging for Linux
 - [ ] Add a LICENSE file (GPL-3.0 full text)

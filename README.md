@@ -1,63 +1,58 @@
 # ovpn-launcher
 
-Multi-version OpenVPN connection manager for Linux with a **PyQt6 GUI** (KDE Plasma system tray) and a **Python CLI** companion.
+Multi-version OpenVPN connection manager for **Linux** and **Windows** with a **PyQt6 GUI** and a **Python CLI** companion.
 
-Manage multiple VPN connections, each pinned to a specific OpenVPN version compiled from source. Credentials are optionally pulled from a KeePass database via `keepassxc-cli`.
+Manage multiple VPN connections, each pinned to a specific OpenVPN version. Credentials are optionally pulled from a KeePass database via `keepassxc-cli`.
 
 ![License](https://img.shields.io/badge/license-GPL--3.0-blue)
 
 ## Features
 
-- **Multi-version OpenVPN** — run different OpenVPN versions per connection (compiled to `/opt/openvpn-<version>/`)
+- **Multi-version OpenVPN** — run different OpenVPN versions per connection
+- **Cross-platform** — Linux (KDE Plasma tray) and Windows (Fusion style, NSIS installer)
 - **GUI** — PyQt6 app with system tray, hamburger menu, profile management, connection log with colors and search
 - **CLI** — `ovpn-connect` Python CLI for headless/terminal use
 - **KeePass integration** — auto-fetch VPN credentials from a KeePass database (configurable entry name per profile)
-- **Build from GUI** — download and compile any OpenVPN version directly from the app
+- **Build / Install from GUI** — compile OpenVPN from source (Linux) or extract from official MSI (Windows)
 - **Settings** — configurable timeouts, reconnect delay, IP service, log level, OpenVPN prefix, KeePass DB path
 - **Auto-reconnect** — exponential backoff (5s, 10s, 20s, 60s) on unexpected disconnection
 - **Import/Export** — import .ovpn files or profile .zip archives, export profiles for sharing
 
-## Requirements
-
-- Python 3.10+
-- PyQt6
-- PyYAML
-- `keepassxc-cli` (optional, for credential lookup)
-- Build tools for compiling OpenVPN (gcc, make, libssl-dev, liblzo2-dev)
-
 ## Installation
+
+### Linux
 
 ```bash
 git clone https://github.com/kahennig/vpn-launcher.git
 cd vpn-launcher
-
-# Install the app and CLI
 sudo make install
-
-# Create initial config (only if it doesn't exist yet)
-make install-config
+make install-config  # creates initial config (only if it doesn't exist)
 ```
+
+Requirements: Python 3.10+, PyQt6, PyYAML, build tools for compiling OpenVPN (gcc, make, libssl-dev, liblzo2-dev).
+
+### Windows
+
+Download from [Releases](https://github.com/kahennig/vpn-launcher/releases):
+- **`ovpn-launcher-setup.exe`** — installer with Start Menu shortcut, Desktop shortcut, and uninstaller
+- **`ovpn-launcher.exe`** — standalone portable executable
+
+The app requests Administrator privileges on launch (required for OpenVPN routing).
 
 For development:
-
 ```bash
-make dev  # pip install -e .
-```
-
-## Building OpenVPN Versions
-
-From the GUI: click the **Build OpenVPN** button in the toolbar — it fetches available versions from GitHub and handles download, compilation, and installation.
-
-Or from the command line:
-
-```bash
-sudo ./scripts/build-openvpn.sh 2.6.14
-sudo ./scripts/build-openvpn.sh 2.5.11
+make dev  # Linux: pip install -e .
+pip install -e .  # Windows
 ```
 
 ## Configuration
 
-Configuration lives in `~/.config/ovpn-launcher/config.yaml`:
+Configuration file location:
+
+| Platform | Path |
+|----------|------|
+| Linux | `~/.config/ovpn-launcher/config.yaml` |
+| Windows | `%APPDATA%\ovpn-launcher\config.yaml` |
 
 ```yaml
 settings:
@@ -80,12 +75,9 @@ profiles:
     config: /home/user/.config/ovpn-launcher/configs/office.ovpn
 ```
 
-- Use `system` as version to use `/usr/bin/openvpn`
-- `auth_mode` is optional (defaults to `none`): `none`, `keepass`, `prompt`
-- `keepass_entry` is optional — if omitted, the alias is used as the KeePass entry title
-- Settings are also editable from the GUI via ☰ → Settings
-
-Legacy `connections.conf` (pipe-delimited) is auto-migrated to YAML on first load.
+- Use `system` as version to use the system-installed OpenVPN
+- `auth_mode`: `none` (default), `keepass`, `prompt`
+- Settings are editable from the GUI via ☰ → Settings
 
 ## Usage
 
@@ -114,6 +106,13 @@ ovpn-connect --status                 # check if openvpn is running
 ovpn-connect --version                # show version
 ```
 
+## Building OpenVPN Versions
+
+From the GUI: click **Build OpenVPN** in the toolbar — it fetches available versions from GitHub.
+
+- **Linux**: downloads source, compiles, and installs to `/opt/openvpn-<version>/`
+- **Windows**: downloads official MSI, extracts `openvpn.exe` + required DLLs to `%LOCALAPPDATA%\ovpn-launcher\openvpn\openvpn-<version>\`
+
 ## Project Structure
 
 ```
@@ -122,28 +121,23 @@ ovpn-launcher/
 │   ├── __init__.py       # Version string
 │   ├── app.py            # PyQt6 GUI application
 │   ├── cli.py            # Python CLI companion
-│   ├── builder.py        # OpenVPN download and compilation
-│   ├── paths.py          # XDG-compliant path definitions
+│   ├── dialogs.py        # GUI dialogs (Profile, Settings, Build)
+│   ├── services.py       # Business logic (no Qt dependency)
+│   ├── builder.py        # OpenVPN download, compilation, MSI extraction
+│   ├── paths.py          # Cross-platform path definitions
 │   └── profiles.py       # YAML config loading/saving, settings, migration
 ├── scripts/
 │   ├── ovpn-connect      # Legacy bash CLI (kept for reference)
 │   └── build-openvpn.sh  # OpenVPN build script (bash)
-├── tests/
-│   ├── test_app.py       # GUI tests (pytest-qt)
-│   ├── test_paths.py     # Path tests
-│   └── test_profiles.py  # Profile/settings/migration tests
-├── config/
-│   ├── config.yaml.example
-│   └── connections.conf.example  # Legacy format reference
+├── tests/                # 105 tests (pytest + pytest-qt)
+├── config/               # Example config files
 ├── share/
 │   ├── applications/ovpn-launcher.desktop
-│   └── icons/ovpn-launcher.svg
-├── docs/
-│   ├── architecture.md
-│   ├── development.md
-│   ├── migration.md
-│   └── user-guide.md
-├── .github/workflows/ci.yml
+│   └── icons/            # App icon (SVG, ICO) + bundled Breeze themes
+├── docs/                 # Architecture, development, user guide
+├── installer.nsi         # NSIS installer script (Windows)
+├── ovpn-launcher.spec    # PyInstaller spec (Windows)
+├── .github/workflows/    # CI + Windows build pipeline
 ├── pyproject.toml
 ├── Makefile
 └── README.md
@@ -151,9 +145,13 @@ ovpn-launcher/
 
 ## Uninstall
 
+### Linux
 ```bash
 sudo make uninstall
 ```
+
+### Windows
+Use Add/Remove Programs, or run the uninstaller from the Start Menu.
 
 ## License
 

@@ -3,34 +3,35 @@
 ## Component Overview
 
 ```
-┌─────────────────────────────────────────────────┐
-│                  User                            │
-│         ┌──────────┐  ┌──────────────┐          │
-│         │ ovpn-app │  │ ovpn-connect │          │
-│         │  (GUI)   │  │ (Python CLI) │          │
-│         └────┬─────┘  └──────┬───────┘          │
-│              │               │                   │
-│    ┌─────────▼───────────────▼──────────┐       │
-│    │  paths.py + profiles.py + builder.py│       │
-│    │  (shared config, loading, building) │       │
-│    └─────────────────┬──────────────────┘       │
-│                      │                           │
-│         ┌────────────▼───────────────┐          │
-│         │ ~/.config/ovpn-launcher/   │          │
-│         │  config.yaml               │          │
-│         │  configs/*.ovpn            │          │
-│         │  logs/*.log                │          │
-│         └────────────────────────────┘          │
-│                                                  │
-│  ┌───────────────────────────────────────────┐  │
-│  │ /opt/openvpn-<ver>/sbin/openvpn           │  │
-│  │ /usr/bin/openvpn (system)                 │  │
-│  └───────────────────────────────────────────┘  │
-│                                                  │
-│  ┌───────────────────────────────────────────┐  │
-│  │ keepassxc-cli (optional)                  │  │
-│  └───────────────────────────────────────────┘  │
-└─────────────────────────────────────────────────┘
++--------------------------------------------------+
+|                    User                           |
+|         +----------+  +--------------+            |
+|         | ovpn-app |  | ovpn-connect |            |
+|         |  (GUI)   |  | (Python CLI) |            |
+|         +----+-----+  +------+-------+            |
+|              |               |                    |
+|    +---------v---------------v----------+         |
+|    | services.py + paths.py + profiles.py|        |
+|    | + builder.py + dialogs.py           |        |
+|    +---------------------+---------------+        |
+|                          |                        |
+|         +----------------v---------------+        |
+|         | Config directory               |        |
+|         | Linux: ~/.config/ovpn-...      |        |
+|         | Win:   %APPDATA%/ovpn-...      |        |
+|         +--------------------------------+        |
+|                                                   |
+|  +---------------------------------------------+ |
+|  | OpenVPN binaries                             | |
+|  | Linux: /opt/openvpn-<ver>/sbin/openvpn       | |
+|  | Win:   %LOCALAPPDATA%/.../bin/openvpn.exe    | |
+|  | System: /usr/bin/openvpn or Program Files    | |
+|  +---------------------------------------------+ |
+|                                                   |
+|  +---------------------------------------------+ |
+|  | keepassxc-cli (optional)                     | |
+|  +---------------------------------------------+ |
++---------------------------------------------------+
 ```
 
 ## Modules
@@ -51,30 +52,38 @@
 
 1. User selects a profile from the tree widget
 2. App validates .ovpn (checks for `remote` and `dev` directives)
-3. App resolves the OpenVPN binary path via `paths.openvpn_binary(version, prefix)`
-4. Based on `auth_mode`:
+3. On Windows: checks admin privileges and Interactive Service status
+4. App resolves the OpenVPN binary path via `paths.openvpn_binary(version, prefix)`
+5. Based on `auth_mode`:
    - `none` — no credentials, connect directly
    - `keepass` — prompts for master password, fetches user/pass from KeePass via `keepassxc-cli` (uses `keepass_entry` or alias)
    - `prompt` — shows two QInputDialog prompts for username and password
-5. Writes credentials to a temp file (0600 permissions) if obtained
-6. Launches `pkexec <openvpn-binary> --config <file> [--auth-user-pass <authfile>]` via QProcess
-7. Starts connection timeout timer (configurable, default 30s)
-8. Opens log file in `~/.config/ovpn-launcher/logs/`
-9. Monitors stdout for "Initialization Sequence Completed" to update state
-10. On connect: saves `last_connected` timestamp, fetches public IP, shows notification with IP
-11. On disconnect: sends kill via `pkexec kill <pid>`, cleans up auth file and log file
-12. On unexpected process exit: auto-reconnects with exponential backoff (5s, 10s, 20s, 60s, max 5 attempts)
+6. Writes credentials to a temp file (0600 permissions) if obtained
+7. Launches OpenVPN via QProcess:
+   - **Linux**: `pkexec <openvpn-binary> --config <file> [--auth-user-pass <authfile>]`
+   - **Windows**: `<openvpn-binary> --config <file> [--dev-node ovpn-launcher] [--auth-user-pass <authfile>]` (already elevated)
+8. Starts connection timeout timer (configurable, default 30s)
+9. Opens log file in config logs directory
+10. Monitors stdout for "Initialization Sequence Completed" to update state
+11. On connect: saves `last_connected` timestamp, fetches public IP, shows notification with IP
+12. On disconnect: kills process, cleans up auth file and log file
+13. On unexpected process exit: auto-reconnects with exponential backoff (5s, 10s, 20s, 60s, max 5 attempts)
 
 ### CLI (ovpn-connect)
 
 1. Resolves profile from config.yaml (alias mode) or takes version+config directly
 2. Same auth_mode logic: `none` (direct), `keepass` (getpass), `prompt` (input)
-3. Launches `sudo <openvpn-binary> --config <file> [--auth-user-pass <authfile>]`
+3. Launches with privilege escalation:
+   - **Linux**: `sudo <openvpn-binary> --config <file> [--auth-user-pass <authfile>]`
+   - **Windows**: direct execution (assumes admin)
 4. atexit cleans up auth file
 
 ## Config Format (YAML)
 
-`~/.config/ovpn-launcher/config.yaml`:
+| Platform | Config path |
+|----------|-------------|
+| Linux | `~/.config/ovpn-launcher/config.yaml` |
+| Windows | `%APPDATA%\ovpn-launcher\config.yaml` |
 
 ```yaml
 settings:
@@ -124,7 +133,7 @@ Legacy `connections.conf` (pipe-delimited) is auto-migrated on first load.
 - **Log colors** — errors red, warnings orange, success green
 - **Log search** — Ctrl+F with find next
 - **Log copy** — Ctrl+Shift+C or double-click line
-- **Persistent logs** — saved to `~/.config/ovpn-launcher/logs/`
+- **Persistent logs** — saved to logs directory
 - **Tray notifications** — connect (with IP), disconnect
 - **System tray** — minimize to tray, quick-connect menu with active profile indicator
 - **Connection timer** — elapsed time in status bar
@@ -133,8 +142,8 @@ Legacy `connections.conf` (pipe-delimited) is auto-migrated on first load.
 - **Last connected** — timestamp per profile
 - **Settings dialog** — all settings editable from GUI
 - **Autostart** — toggle from hamburger menu
-- **About dialog** — version, features, author, license
-- **Custom icon** — SVG shield with lock
+- **About dialog** — version, features, author, credits, license
+- **Custom icon** — SVG shield with lock (transparent background)
 - **Splash screen** — shown during startup
 
 ## OpenVPN Version Management

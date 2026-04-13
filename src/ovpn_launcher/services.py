@@ -5,6 +5,7 @@ import os
 import shutil
 import socket
 import subprocess
+import sys
 import zipfile
 from pathlib import Path
 from urllib.request import urlopen, Request
@@ -335,9 +336,11 @@ def enable_autostart():
     """Enable autostart at login."""
     AUTOSTART_DIR.mkdir(parents=True, exist_ok=True)
     if IS_WINDOWS:
-        AUTOSTART_FILE.write_text(
-            'CreateObject("WScript.Shell").Run '
-            '"pythonw -m ovpn_launcher.app", 0, False\n'
+        _create_windows_shortcut(
+            AUTOSTART_FILE,
+            target=sys.executable,
+            arguments='-m ovpn_launcher.app',
+            description='VPN Launcher',
         )
     else:
         AUTOSTART_FILE.write_text(
@@ -345,6 +348,22 @@ def enable_autostart():
             "Exec=ovpn-app\nIcon=ovpn-launcher\nTerminal=false\n"
             "X-GNOME-Autostart-enabled=true\n"
         )
+
+
+def _create_windows_shortcut(lnk_path, target, arguments='', description=''):
+    """Create a Windows .lnk shortcut using PowerShell."""
+    ps_script = (
+        f'$ws = New-Object -ComObject WScript.Shell; '
+        f'$s = $ws.CreateShortcut("{lnk_path}"); '
+        f'$s.TargetPath = "{target}"; '
+        f'$s.Arguments = "{arguments}"; '
+        f'$s.Description = "{description}"; '
+        f'$s.Save()'
+    )
+    subprocess.run(
+        ['powershell', '-NoProfile', '-Command', ps_script],
+        capture_output=True, timeout=10,
+    )
 
 
 def disable_autostart():
