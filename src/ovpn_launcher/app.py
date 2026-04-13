@@ -34,7 +34,7 @@ from .services import (
     elevate_command, kill_command, fetch_public_ip, dns_resolver_ip,
     is_autostart_enabled, enable_autostart, disable_autostart,
     windows_driver_args, is_interactive_service_running, list_tap_adapters,
-    get_system_version, ensure_adapter,
+    get_system_version, ensure_adapter, needs_admin_warning,
 )
 
 log = logging.getLogger(__name__)
@@ -860,13 +860,12 @@ class VPNLauncher(QMainWindow):
             if ans != QMessageBox.StandardButton.Yes:
                 return
 
-        if IS_WINDOWS and not is_interactive_service_running():
+        if IS_WINDOWS and needs_admin_warning():
             ans = QMessageBox.warning(
-                self, "Service Not Running",
-                "OpenVPN Interactive Service is not running.\n"
-                "Connections may fail or route traffic incorrectly.\n\n"
-                "Install OpenVPN fully (MSI) to set up the service,\n"
-                "or run this app as Administrator.\n\nConnect anyway?",
+                self, "Administrator Required",
+                "OpenVPN needs administrator privileges to modify routes.\n\n"
+                "Either run this app as Administrator, or install OpenVPN\n"
+                "fully (MSI) to enable the Interactive Service.\n\nConnect anyway?",
                 QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
             )
             if ans != QMessageBox.StandardButton.Yes:

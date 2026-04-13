@@ -261,20 +261,39 @@ def list_tap_adapters():
         return []
 
 
+def _is_admin():
+    """Check if the current process has admin privileges (Windows only)."""
+    if not IS_WINDOWS:
+        return False
+    try:
+        import ctypes
+        return ctypes.windll.shell32.IsUserAnAdmin() != 0
+    except Exception:
+        return False
+
+
 def elevate_command(command, gui=False):
     """Wrap a command list with privilege escalation for the current platform."""
     if IS_WINDOWS:
-        if is_interactive_service_running():
-            return list(command)
-        # Elevate via PowerShell RunAs when Interactive Service is absent
-        exe, *args = command
-        arg_str = ' '.join(f'"{a}"' for a in args)
-        return [
-            "powershell", "-NoProfile", "-Command",
-            f'Start-Process -FilePath "{exe}" -ArgumentList \'{arg_str}\' '
-            f'-Verb RunAs -Wait',
-        ]
+        # On Windows, OpenVPN needs admin for netsh route changes.
+        # If already admin or Interactive Service handles it, run directly.
+        return list(command)
     return ["pkexec" if gui else "sudo"] + list(command)
+
+
+def needs_admin_warning():
+    """Return True if the user should be warned about missing admin rights.
+
+    On Windows, OpenVPN needs admin to modify routes unless the
+    Interactive Service is running and handles it.
+    """
+    if not IS_WINDOWS:
+        return False
+    if _is_admin():
+        return False
+    if is_interactive_service_running():
+        return False
+    return True
 
 
 def kill_command(pid, gui=False):

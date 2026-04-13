@@ -13,7 +13,7 @@ from pathlib import Path
 from . import __version__
 from .paths import openvpn_binary
 from .profiles import load_profiles, save_profiles, load_settings, detect_versions, VALID_AUTH_MODES
-from .services import elevate_command, fetch_keepass_creds, windows_driver_args, is_interactive_service_running, get_system_version
+from .services import elevate_command, fetch_keepass_creds, windows_driver_args, needs_admin_warning, get_system_version
 from .paths import IS_WINDOWS
 
 
@@ -168,10 +168,9 @@ def cmd_connect(alias=None, version=None, config=None):
     print(f"Connecting with OpenVPN {version} ({binary})")
     print(f"Config: {config}")
 
-    if IS_WINDOWS and not is_interactive_service_running():
-        print("WARNING: OpenVPN Interactive Service is not running.")
-        print("Connections may fail or route traffic incorrectly.")
-        print("Install OpenVPN fully (MSI) or run as Administrator.")
+    if IS_WINDOWS and needs_admin_warning():
+        print("WARNING: Not running as Administrator and Interactive Service is not running.")
+        print("OpenVPN may fail to modify routes. Run as Administrator or install OpenVPN MSI.")
 
     args = elevate_command([str(binary), "--config", config] + windows_driver_args())
     user, pwd = get_credentials(alias or "", auth_mode, keepass_entry, settings)
