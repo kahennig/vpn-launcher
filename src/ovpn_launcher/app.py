@@ -1026,18 +1026,15 @@ class VPNLauncher(QMainWindow):
         if state == self.STATE_DISCONNECTED:
             label = "Disconnected"
             color = pal.color(QPalette.ColorRole.PlaceholderText)
-            tray_icon = "network-vpn-disconnected"
             tray_tip = "VPN Launcher — Disconnected"
             self._elapsed_timer.stop()
         elif state == self.STATE_CONNECTING:
             label = f"Connecting: {self.connected_alias}…"
             color = pal.color(QPalette.ColorRole.Link)
-            tray_icon = "network-vpn-acquiring"
             tray_tip = f"VPN Launcher — Connecting: {self.connected_alias}"
         else:
             label = f"Connected: {self.connected_alias}"
             color = pal.color(QPalette.ColorRole.Link)
-            tray_icon = "network-vpn"
             tray_tip = f"VPN Launcher — Connected: {self.connected_alias}"
             self._elapsed_seconds = 0
             self._elapsed_timer.start(1000)
@@ -1045,10 +1042,13 @@ class VPNLauncher(QMainWindow):
         self.status_text.setText(label)
         self.status_text.setStyleSheet(f"color: {color.name()};")
 
-        icon = _themed_icon(tray_icon, SP.SP_DriveNetIcon)
-        self.status_icon.setPixmap(icon.pixmap(16, 16))
+        if state == self.STATE_CONNECTING:
+            status_icon = _themed_icon("network-vpn-acquiring", SP.SP_BrowserReload)
+        else:
+            status_icon = _app_icon()
+        self.status_icon.setPixmap(status_icon.pixmap(16, 16))
 
-        self.tray.setIcon(icon)
+        self.tray.setIcon(_app_icon())
         self.tray.setToolTip(tray_tip)
 
         if state == self.STATE_CONNECTED:

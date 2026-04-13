@@ -49,6 +49,6 @@ exe = EXE(
     target_arch=None,
     codesign_identity=None,
     entitlements_file=None,
-    icon=None,
+    icon='share/icons/ovpn-launcher.ico',
     uac_admin=True,
 )
