@@ -132,9 +132,9 @@ def fetch_keepass_creds(entry, db_path, master_password):
 
 def windows_driver_args():
     """Return extra OpenVPN args for Windows driver selection."""
-    if not IS_WINDOWS:
-        return []
-    return ["--windows-driver", "wintun"]
+    # Let OpenVPN auto-select the available driver (wintun or tap-windows6).
+    # Forcing --windows-driver can fail if the adapter is already in use.
+    return []
 
 
 _system_version_cache = None
