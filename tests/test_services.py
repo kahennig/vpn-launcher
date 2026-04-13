@@ -222,8 +222,16 @@ class TestElevateCommand:
         assert elevate_command(["openvpn", "--config", "x"], gui=False) == ["sudo", "openvpn", "--config", "x"]
 
     @patch("ovpn_launcher.services.IS_WINDOWS", True)
-    def test_windows(self):
+    @patch("ovpn_launcher.services.is_interactive_service_running", return_value=True)
+    def test_windows_with_service(self, _mock_svc):
         assert elevate_command(["openvpn", "--config", "x"], gui=True) == ["openvpn", "--config", "x"]
+
+    @patch("ovpn_launcher.services.IS_WINDOWS", True)
+    @patch("ovpn_launcher.services.is_interactive_service_running", return_value=False)
+    def test_windows_without_service(self, _mock_svc):
+        result = elevate_command(["openvpn", "--config", "x"], gui=True)
+        assert result[0] == "powershell"
+        assert "RunAs" in result[-1]
 
 
 class TestKillCommand:

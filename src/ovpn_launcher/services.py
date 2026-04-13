@@ -189,7 +189,16 @@ def list_tap_adapters():
 def elevate_command(command, gui=False):
     """Wrap a command list with privilege escalation for the current platform."""
     if IS_WINDOWS:
-        return list(command)
+        if is_interactive_service_running():
+            return list(command)
+        # Elevate via PowerShell RunAs when Interactive Service is absent
+        exe, *args = command
+        arg_str = ' '.join(f'"{a}"' for a in args)
+        return [
+            "powershell", "-NoProfile", "-Command",
+            f'Start-Process -FilePath "{exe}" -ArgumentList \'{arg_str}\' '
+            f'-Verb RunAs -Wait',
+        ]
     return ["pkexec" if gui else "sudo"] + list(command)
 
 
