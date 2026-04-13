@@ -1164,10 +1164,32 @@ def _app_icon():
     return _themed_icon("ovpn-launcher", SP.SP_DriveNetIcon)
 
 
+def _request_admin_relaunch():
+    """On Windows, re-launch the app as Administrator if not already elevated."""
+    if not IS_WINDOWS:
+        return False
+    from .services import _is_admin
+    if _is_admin():
+        return False
+    try:
+        import ctypes
+        # Re-launch with UAC elevation
+        params = ' '.join(f'"{a}"' for a in sys.argv)
+        exe = sys.executable
+        ctypes.windll.shell32.ShellExecuteW(None, "runas", exe, params, None, 1)
+        return True  # Signal caller to exit current (non-admin) instance
+    except Exception:
+        return False
+
+
 def main():
     def _excepthook(exc_type, exc_value, exc_tb):
         log.error("Unhandled exception", exc_info=(exc_type, exc_value, exc_tb))
     sys.excepthook = _excepthook
+
+    # On Windows, re-launch as admin if needed (before creating QApplication)
+    if IS_WINDOWS and _request_admin_relaunch():
+        sys.exit(0)
 
     logging.basicConfig(
         level=getattr(logging, os.environ.get("OVPN_LOG_LEVEL", "").upper() or load_settings().get("log_level", "WARNING"), logging.WARNING),
